@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "logseq-markdown",
+  "owner": "jluo41",
+  "repo": "tools",
+  "path": "plugins/logseq/skills/logseq-markdown",
+  "branch": "main",
+  "sha": "bf4ef1cc908e925e151b6d682faff96a17ee94d0",
+  "source": "manual"
+}

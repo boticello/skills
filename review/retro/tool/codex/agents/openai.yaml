@@ -1,0 +1,7 @@
+interface:
+  display_name: "Retro"
+  short_description: "Turn work friction into durable improvements."
+  default_prompt: "Use $retro to run a concise retro on recent work and identify the smallest durable improvement that would have prevented the friction."
+
+policy:
+  allow_implicit_invocation: true
