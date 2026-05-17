@@ -19,10 +19,11 @@ skillkit tap add bear/skills
 | **analysis** | file-introspection, csv-data-summarizer, ship-learn-next |
 | **debug** | code-debug, root-cause-debugger |
 | **domain** | pharmaceutical-definition-creator, ruby-code-analysis |
-| **knowledge-management** | documentation-writing, logseq-markdown |
-| **planning** | feature-handoff, orchestration, plan, ticket-closedown, update-docs, wrap |
+| **go-slice** | go-slice-implementer, go-slice-planner, go-slice-reviewer, slice-retro |
+| **knowledge-management** | documentation-writing, documentation-writer, logseq-markdown |
+| **planning** | discovery-architect, feature-handoff, orchestration, plan, spike-planning, ticket-closedown, update-docs, wrap |
 | **review** | code-review, remind-management, retro, verify |
-| **tools** | context7-mcp, database-migration |
+| **tools** | context7-mcp, database-migration, find-skills |
 | **vcs** | git-change-manage, git-vcs, jj-change-manage, jj-vcs, work-unit-manage |
 | **web** | article-extractor, tapestry, youtube-transcript |
 
