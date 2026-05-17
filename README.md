@@ -6,26 +6,27 @@ Portable AI agent skills — install once, deploy everywhere.
 
 ```bash
 # Add all skills via SkillKit
-skillkit add bear/skills
+skillkit add boticello/skills
 
 # Or add as a tapped source for ongoing updates
-skillkit tap add bear/skills
+skillkit tap add boticello/skills
 ```
 
 ## What's here
 
+29 original skills across 10 categories:
+
 | Category | Skills |
 |----------|--------|
-| **analysis** | file-introspection, csv-data-summarizer, ship-learn-next |
+| **analysis** | file-introspection |
 | **debug** | code-debug, root-cause-debugger |
 | **domain** | pharmaceutical-definition-creator, ruby-code-analysis |
 | **go-slice** | go-slice-implementer, go-slice-planner, go-slice-reviewer, slice-retro |
-| **knowledge-management** | documentation-writing, documentation-writer, logseq-markdown |
+| **knowledge-management** | documentation-writing, documentation-writer |
 | **planning** | discovery-architect, feature-handoff, orchestration, plan, spike-planning, ticket-closedown, update-docs, wrap |
 | **review** | code-review, remind-management, retro, verify |
-| **tools** | context7-mcp, database-migration, find-skills |
+| **tools** | database-migration |
 | **vcs** | git-change-manage, git-vcs, jj-change-manage, jj-vcs, work-unit-manage |
-| **web** | article-extractor, tapestry, youtube-transcript |
 
 ## Skill format
 
