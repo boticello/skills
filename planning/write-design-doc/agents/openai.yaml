@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Design Doc"
+  short_description: "Draft technical design documents"
+  default_prompt: "Write a technical design document for the proposed system or change."

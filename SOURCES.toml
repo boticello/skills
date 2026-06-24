@@ -11,3 +11,47 @@
 #
 # Add entries automatically with:
 #   ./deploy/skills-deploy fetch owner/repo
+
+[nia]
+url = "https://github.com/nozomio-labs/nia-skill"
+commit = "b253a81f257d219f9842d864f9991be287bfc66f"
+
+[last30days]
+url = "https://github.com/mvanhorn/last30days-skill"
+commit = "977f0beed5ad4dbc604f6762a4b27ab8efbd3504"
+
+[omnigraph]
+url = "https://github.com/ModernRelay/omnigraph"
+commit = "4a5277b9c027d2916b2985a2e7ec26e6203a9c34"
+
+[csv-data-summarizer]
+url = "https://github.com/coffeefuelbump/csv-data-summarizer-claude-skill"
+commit = "9b3affd270f85aaf1c8a7a457f510034d5736cde"
+
+[youtube-transcript]
+url = "https://github.com/intellectronica/agent-skills"
+commit = "9b0e00ad1b941165e2506545bbfddafa34cf2cb8"
+
+[ship-learn-next]
+url = "https://github.com/softaworks/agent-toolkit"
+commit = "3027f20f3181758385a1bb8c022d4041dfb4de84"
+
+[article-extractor]
+url = "UNKNOWN — verify upstream"
+commit = "unverified"
+
+[tapestry]
+url = "UNKNOWN — verify upstream"
+commit = "unverified"
+
+[logseq-markdown]
+url = "UNKNOWN — verify upstream"
+commit = "unverified"
+
+[total-recall]
+url = "UNKNOWN — verify upstream"
+commit = "unverified"
+
+[use-railway]
+url = "UNKNOWN — verify upstream"
+commit = "unverified"

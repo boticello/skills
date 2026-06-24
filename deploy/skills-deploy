@@ -382,7 +382,17 @@ cmd_fetch() {
         chosen="${found[$idx]}"
     fi
 
-    local sname; sname="$(basename "$chosen")"
+    local sname
+    if [[ "$chosen" == "$tmp/repo" ]]; then
+        # SKILL.md is at the repo root: name the skill after the repo itself,
+        # not the clone dir ('repo'). Strips trailing .git and any skill suffix.
+        sname="$(basename "$url")"
+        sname="${sname%.git}"
+        sname="${sname%-skill}"
+        sname="${sname%-claude-skill}"
+    else
+        sname="$(basename "$chosen")"
+    fi
     local dest="$VENDOR_DIR/$sname"
     if [[ -e "$dest" ]]; then
         echo "$(red 'error'): vendor destination already exists: $dest" >&2

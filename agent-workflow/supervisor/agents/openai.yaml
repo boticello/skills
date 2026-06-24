@@ -1,0 +1,4 @@
+interface:
+  display_name: "Supervisor"
+  short_description: "Supervise engineering phases"
+  default_prompt: "Supervise this engineering phase: plan the slice, delegate where useful, integrate results, verify, report, and prepare a handoff when the supervisor should retire."

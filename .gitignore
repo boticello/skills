@@ -9,3 +9,7 @@ skills-lock.json
 # Vendored third-party skills — local only, never pushed.
 # Provenance lives in SOURCES.toml (tracked).
 vendor/
+
+# Python bytecode
+__pycache__/
+*.pyc
