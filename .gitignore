@@ -1,6 +1,11 @@
-# SkillKit generated files
+# SkillKit generated files (legacy — no longer used, but kept in case of re-run)
 .codex/
+.claude/
 AGENTS.md
 skills-lock.json
 .skills
 .skillkit/
+
+# Vendored third-party skills — local only, never pushed.
+# Provenance lives in SOURCES.toml (tracked).
+vendor/

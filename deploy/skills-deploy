@@ -1,0 +1,485 @@
+#!/usr/bin/env bash
+#
+# skills-deploy — copy canonical skills to agent harness target directories.
+#
+# Model:
+#   ~/Me/repos/skills/  is the ONLY source of truth (this repo, git-tracked).
+#     originals/<category>/<skill>/   your authored skills (tracked, pushed)
+#     vendor/<skill>/                 third-party skills (gitignored, not pushed)
+#     SOURCES.toml                    provenance for vendor/ (url + commit)
+#     allowlist.txt                   target entries the deploy must NOT touch
+#
+#   Targets are generated; never hand-edit them:
+#     ~/.agents/skills/   ZCode, Zed, Warp, Memo, opencode-CLI
+#     ~/.codex/skills/    Codex (its .system/ built-ins are skipped)
+#
+# The repo directory tree IS the state. There is no lockfile or registry to rot.
+# Re-running deploy with no changes is a no-op (rsync skips unchanged files).
+#
+# Craft Agents is intentionally out of scope: pull-based, workspace-scoped,
+# UI-managed. Copy from originals/ or vendor/ via the Craft UI if needed.
+
+set -euo pipefail
+
+# ── Config ─────────────────────────────────────────────────────────────────
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Category skills live directly under the repo root (analysis/, planning/,
+# vcs/, personal/, ...). vendor/ is the only special sibling.
+ORIGINALS_DIR="$REPO_ROOT"
+VENDOR_DIR="$REPO_ROOT/vendor"
+ALLOWLIST="$REPO_ROOT/allowlist.txt"
+SOURCES="$REPO_ROOT/SOURCES.toml"
+
+# Top-level repo dirs that are NOT skill categories (skip when scanning).
+NON_CATEGORY_DIRS=(deploy vendor .skillkit .git)
+
+# Default deploy targets. Override by setting SKILLS_TARGETS (space-separated
+# absolute paths) in the environment.
+SKILLS_TARGETS_DEFAULT=(
+    "$HOME/.agents/skills"
+    "$HOME/.codex/skills"
+)
+
+# Where deleted target skills get backed up (recoverable — never rm -rf).
+BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/skills-backups"
+
+# Files stripped on copy: skillkit/skillfish bookkeeping, not runtime-required.
+STRIP_EXCLUDES=(
+    --exclude='.DS_Store'
+    --exclude='.skillkit.json'
+    --exclude='.skillfish.json'
+)
+
+# ── Helpers ────────────────────────────────────────────────────────────────
+
+color() { printf '\033[%sm%s\033[0m' "$1" "$2"; }
+green()  { color '32' "$1"; }
+yellow() { color '33' "$1"; }
+red()    { color '31' "$1"; }
+cyan()   { color '36' "$1"; }
+dim()    { color '2'  "$1"; }
+
+targets() {
+    if [[ -n "${SKILLS_TARGETS:-}" ]]; then
+        printf '%s\n' $SKILLS_TARGETS
+    else
+        printf '%s\n' "${SKILLS_TARGETS_DEFAULT[@]}"
+    fi
+}
+
+# Read allowlist into a newline-separated string (strip comments/blanks).
+allowlist_patterns() {
+    [[ -f "$ALLOWLIST" ]] || return 0
+    grep -vE '^\s*(#|$)' "$ALLOWLIST" 2>/dev/null || true
+}
+
+# Test whether a top-level repo dir is a skill category (not infra).
+is_category_dir() {
+    local name; name="$(basename "$1")"
+    local skip
+    for skip in "${NON_CATEGORY_DIRS[@]}"; do
+        [[ "$name" == "$skip" ]] && return 1
+    done
+    # Also skip dotfiles and anything not starting with a letter.
+    [[ "$name" == .* ]] && return 1
+    [[ "$name" == [a-z]* ]] || return 1
+    return 0
+}
+
+# Test whether a name matches any allowlist pattern (exact or glob).
+is_allowlisted() {
+    local name="$1" pattern
+    while IFS= read -r pattern; do
+        [[ -z "$pattern" ]] && continue
+        # shellcheck disable=SC2053
+        [[ "$name" == $pattern ]] && return 0
+    done < <(allowlist_patterns)
+    return 1
+}
+
+# List canonical skill names (flattened): one per line, just the skill dir name.
+# originals/ has <category>/<skill>/; vendor/ has <skill>/ directly.
+canonical_skill_names() {
+    local category skill
+    if [[ -d "$ORIGINALS_DIR" ]]; then
+        for category in "$ORIGINALS_DIR"/*/; do
+            [[ -d "$category" ]] || continue
+            is_category_dir "$category" || continue
+            for skill in "$category"*/; do
+                [[ -d "$skill" ]] || continue
+                [[ -f "$skill/SKILL.md" ]] || continue
+                basename "$skill"
+            done
+        done
+    fi
+    if [[ -d "$VENDOR_DIR" ]]; then
+        for skill in "$VENDOR_DIR"/*/; do
+            [[ -d "$skill" ]] || continue
+            [[ -f "$skill/SKILL.md" ]] || continue
+            basename "$skill"
+        done
+    fi
+}
+
+# Resolve the source dir for a canonical skill name (searches originals then vendor).
+canonical_source_for() {
+    local name="$1" category skill
+    if [[ -d "$ORIGINALS_DIR" ]]; then
+        for category in "$ORIGINALS_DIR"/*/; do
+            [[ -d "$category" ]] || continue
+            is_category_dir "$category" || continue
+            skill="${category%/}/$name"
+            if [[ -f "$skill/SKILL.md" ]]; then
+                echo "$skill"; return 0
+            fi
+        done
+    fi
+    if [[ -d "$VENDOR_DIR" ]]; then
+        skill="$VENDOR_DIR/$name"
+        if [[ -f "$skill/SKILL.md" ]]; then
+            echo "$skill"; return 0
+        fi
+    fi
+    return 1
+}
+
+# List real directory entries in a target, skipping symlinks (plugin-managed)
+# and the special .system dir (Codex built-ins).
+target_real_skill_names() {
+    local target="$1" entry name
+    [[ -d "$target" ]] || return 0
+    for entry in "$target"/*/; do
+        [[ -e "$entry" ]] || continue
+        [[ -L "${entry%/}" ]] && continue          # skip symlinks (plugins)
+        name="$(basename "${entry%/}")"
+        [[ "$name" == ".system" ]] && continue      # skip Codex built-ins
+        echo "$name"
+    done
+}
+
+new_backup_dir() {
+    local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+    echo "$BACKUP_ROOT/$stamp"
+}
+
+# ── Subcommand: deploy ─────────────────────────────────────────────────────
+
+cmd_deploy() {
+    local dry_run=0
+    [[ "${1:-}" == "--dry-run" ]] && dry_run=1
+
+    local canonical; canonical="$(canonical_skill_names | sort -u)"
+    if [[ -z "$canonical" ]]; then
+        echo "$(red 'error'): no canonical skills found under $ORIGINALS_DIR or $VENDOR_DIR" >&2
+        return 1
+    fi
+    local canonical_count; canonical_count=$(echo "$canonical" | wc -l | tr -d ' ')
+    echo "$(cyan 'deploy'): $canonical_count canonical skill(s)"
+    [[ $dry_run -eq 1 ]] && echo "$(dim '(dry-run — no changes written)')"
+    echo
+
+    local target name src dest
+    local adds=0 updates=0 unchanged=0 removes=0 skipped_allow=0 skipped_link=0
+
+    while IFS= read -r target; do
+        [[ -n "$target" ]] || continue
+        echo "$(cyan 'target'): $target"
+
+        # ── Copy/update each canonical skill into this target ──
+        while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            src="$(canonical_source_for "$name")"
+            dest="$target/$name"
+
+            if [[ -L "$dest" ]]; then
+                # Symlink in target — leave it (plugin-managed or hand-wired).
+                echo "  $(yellow 'skip-link ') $name"
+                skipped_link=$((skipped_link+1))
+                continue
+            fi
+
+            if [[ ! -e "$dest" ]]; then
+                if [[ $dry_run -eq 1 ]]; then
+                    echo "  $(green 'add     ') $name"
+                else
+                    rsync -aL "${STRIP_EXCLUDES[@]}" "$src/" "$dest/"
+                    echo "  $(green 'added   ') $name"
+                fi
+                adds=$((adds+1))
+            else
+                if [[ $dry_run -eq 1 ]]; then
+                    # Report whether it would change (rsync --dry-run --itemize-changes).
+                    local diff
+                    diff="$(rsync -aL --dry-run --itemize-changes --out-format='%n' \
+                                "${STRIP_EXCLUDES[@]}" "$src/" "$dest/" || true)"
+                    if [[ -z "$diff" ]]; then
+                        echo "  $(dim 'unchanged') $name"; unchanged=$((unchanged+1))
+                    else
+                        echo "  $(yellow 'update   ') $name"; updates=$((updates+1))
+                    fi
+                else
+                    rsync -aL --delete "${STRIP_EXCLUDES[@]}" "$src/" "$dest/"
+                    echo "  $(yellow 'updated ') $name"
+                    updates=$((updates+1))
+                fi
+            fi
+        done <<< "$canonical"
+
+        # ── Mirror cleanup: remove target skills not in canonical ──
+        while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            if grep -qxF "$name" <<< "$canonical"; then
+                continue   # managed skill
+            fi
+            if is_allowlisted "$name"; then
+                echo "  $(dim 'skip-alw  ') $name"
+                skipped_allow=$((skipped_allow+1))
+                continue
+            fi
+            if [[ $dry_run -eq 1 ]]; then
+                echo "  $(red 'remove   ') $name  $(dim '(would back up + delete)')"
+            else
+                local backup; backup="$(new_backup_dir)"
+                mkdir -p "$backup"
+                mv "$target/$name" "$backup/"
+                echo "  $(red 'removed ') $name  $(dim "(backed up -> $backup/$name)")"
+            fi
+            removes=$((removes+1))
+        done < <(target_real_skill_names "$target")
+
+        echo
+    done < <(targets)
+
+    echo "$(cyan 'summary'): ${adds} added, ${updates} updated, ${unchanged} unchanged, ${removes} removed, ${skipped_allow} allowlisted, ${skipped_link} symlink-skipped"
+}
+
+# ── Subcommand: gather ─────────────────────────────────────────────────────
+# Pulls a stray skill from a target into the canonical store (destination → source).
+# The opposite of bootstrap drift: adopt a skill so deploy can manage it.
+
+cmd_gather() {
+    local name="" from="" category="personal"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --from) from="$2"; shift 2 ;;
+            --category) category="$2"; shift 2 ;;
+            -*) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
+            *) name="$1"; shift ;;
+        esac
+    done
+
+    if [[ -z "$name" ]]; then
+        echo "Usage: skills-deploy gather <name> [--from codex|agents] [--category <cat>]" >&2
+        echo "  Reads a skill from a harness target and adopts it into originals/<category>/<name>/" >&2
+        return 2
+    fi
+
+    # Resolve the source target dir.
+    local src=""
+    case "$from" in
+        codex)  src="$HOME/.codex/skills/$name" ;;
+        agents) src="$HOME/.agents/skills/$name" ;;
+        "") # Auto-detect: prefer .agents then .codex
+            if   [[ -f "$HOME/.agents/skills/$name/SKILL.md" ]]; then src="$HOME/.agents/skills/$name"
+            elif [[ -f "$HOME/.codex/skills/$name/SKILL.md" ]]; then src="$HOME/.codex/skills/$name"; fi
+            ;;
+        *) echo "$(red 'error'): --from must be 'codex' or 'agents'" >&2; return 2 ;;
+    esac
+
+    if [[ -z "$src" || ! -f "$src/SKILL.md" ]]; then
+        echo "$(red 'error'): skill '$name' not found in any target" >&2
+        return 1
+    fi
+
+    local dest="$ORIGINALS_DIR/$category/$name"
+    if [[ -e "$dest" ]]; then
+        echo "$(red 'error'): canonical destination already exists: $dest" >&2
+        echo "  (move or remove it first, or use a different --category)" >&2
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$dest")"
+    rsync -aL "${STRIP_EXCLUDES[@]}" "$src/" "$dest/"
+    echo "$(green 'gathered'): $name"
+    echo "  from: $src"
+    echo "  to:   $dest"
+    echo "  $(dim 'review, then commit. Run deploy to make the target a clean mirror.')"
+}
+
+# ── Subcommand: fetch ──────────────────────────────────────────────────────
+# Acquire a third-party skill via git, record provenance. No skillfish involved.
+
+cmd_fetch() {
+    local repo="" skill="" do_list=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --skill) skill="$2"; shift 2 ;;
+            --list|-l) do_list=1; shift ;;
+            -*) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
+            *) repo="$1"; shift ;;
+        esac
+    done
+
+    if [[ -z "$repo" ]]; then
+        echo "Usage: skills-deploy fetch <owner/repo> [--skill <name>] [--list]" >&2
+        echo "  Clones a skill repo into vendor/ and records provenance in SOURCES.toml." >&2
+        return 2
+    fi
+
+    # Normalize owner/repo → full URL.
+    local url="$repo"
+    [[ "$url" != *://* ]] && url="https://github.com/$url"
+
+    local tmp; tmp="$(mktemp -d)"
+    # shellcheck disable=SC2064
+    trap "rm -rf '$tmp'" EXIT
+
+    echo "$(dim "cloning $url …")"
+    git clone --depth 1 "$url" "$tmp/repo" >&2
+
+    local commit; commit="$(git -C "$tmp/repo" rev-parse HEAD)"
+    local short;  short="$(git -C "$tmp/repo" rev-parse --short HEAD)"
+
+    # Find candidate skills (dirs containing SKILL.md).
+    local -a found=()
+    while IFS= read -r m; do found+=("$(dirname "$m")"); done \
+        < <(find "$tmp/repo" -name SKILL.md -not -path '*/node_modules/*' 2>/dev/null)
+
+    if [[ ${#found[@]} -eq 0 ]]; then
+        echo "$(red 'error'): no SKILL.md found in $url" >&2; return 1
+    fi
+
+    if [[ $do_list -eq 1 ]]; then
+        echo "$(cyan 'skills in $repo'):"
+        local f
+        for f in "${found[@]}"; do echo "  $(basename "$f")  $(dim "$f")"; done
+        return 0
+    fi
+
+    local chosen
+    if [[ -n "$skill" ]]; then
+        chosen=""
+        local f
+        for f in "${found[@]}"; do
+            if [[ "$(basename "$f")" == "$skill" ]]; then chosen="$f"; break; fi
+        done
+        if [[ -z "$chosen" ]]; then
+            echo "$(red 'error'): --skill '$skill' not found. Available:" >&2
+            printf '  %s\n' "${found[@]}" >&2
+            return 1
+        fi
+    elif [[ ${#found[@]} -eq 1 ]]; then
+        chosen="${found[0]}"
+    else
+        echo "$(yellow 'multiple skills found'):" >&2
+        local i=0 f
+        for f in "${found[@]}"; do echo "  [$i] $(basename "$f")  $(dim "$f")" >&2; i=$((i+1)); done
+        printf 'pick one: ' >&2
+        local idx; read -r idx
+        chosen="${found[$idx]}"
+    fi
+
+    local sname; sname="$(basename "$chosen")"
+    local dest="$VENDOR_DIR/$sname"
+    if [[ -e "$dest" ]]; then
+        echo "$(red 'error'): vendor destination already exists: $dest" >&2
+        echo "  (remove it first, or it'll be overwritten on next fetch)" >&2
+        return 1
+    fi
+
+    mkdir -p "$VENDOR_DIR"
+    rsync -aL "${STRIP_EXCLUDES[@]}" "$chosen/" "$dest/"
+
+    # Append provenance to SOURCES.toml.
+    local entry
+    entry="$(printf '[%s]\nurl = "%s"\ncommit = "%s"\n' "$sname" "$url" "$commit")"
+    if [[ -f "$SOURCES" ]] && grep -q "^\[$sname\]" "$SOURCES"; then
+        echo "$(yellow 'note'): $sname already in SOURCES.toml — provenance not updated" >&2
+    else
+        {
+            echo ""
+            echo "$entry"
+        } >> "$SOURCES"
+    fi
+
+    echo "$(green 'fetched'): $sname"
+    echo "  url:    $url"
+    echo "  commit: $short"
+    echo "  to:     $dest"
+    echo "  $(dim 'recorded in SOURCES.toml. Run deploy to fan out to targets.')"
+}
+
+# ── Subcommand: list ───────────────────────────────────────────────────────
+
+cmd_list() {
+    echo "$(cyan 'canonical skills'):"
+    local name src category
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        src="$(canonical_source_for "$name")"
+        if [[ "$src" == "$VENDOR_DIR"/* ]]; then
+            printf '  %-30s %s\n' "$name" "$(dim 'vendor')"
+        else
+            category="$(basename "$(dirname "$src")")"
+            printf '  %-30s %s\n' "$name" "$(dim "$category")"
+        fi
+    done < <(canonical_skill_names | sort -u)
+    echo
+    echo "$(cyan 'targets'):"
+    targets | sed 's/^/  /'
+    echo
+    echo "$(cyan 'allowlist'):"
+    if [[ -f "$ALLOWLIST" ]]; then
+        allowlist_patterns | sed 's/^/  /'
+    else
+        echo "  $(dim '(no allowlist.txt)')"
+    fi
+}
+
+# ── Usage ──────────────────────────────────────────────────────────────────
+
+usage() {
+    cat <<'EOF'
+skills-deploy — manage canonical skills → harness targets
+
+Subcommands:
+  deploy [--dry-run]                 Copy canonical skills to all targets
+                                     (mirror: removes target skills not in canonical,
+                                      unless allowlisted; skips symlinks and .system)
+  gather <name> [--from codex|agents] [--category <cat>]
+                                     Adopt a stray skill from a target into originals/
+  fetch <owner/repo> [--skill <name>] [--list]
+                                     Acquire a third-party skill into vendor/ via git
+  list                               Show canonical skills, targets, and allowlist
+
+Canonical store: ~/Me/repos/skills/
+  originals/<category>/<skill>/      your authored skills (git-tracked)
+  vendor/<skill>/                    third-party (gitignored)
+  SOURCES.toml                       provenance for vendor/
+  allowlist.txt                      target entries never removed
+
+Env:
+  SKILLS_TARGETS                     override default target dirs (space-separated)
+EOF
+}
+
+# ── Dispatch ───────────────────────────────────────────────────────────────
+
+main() {
+    local sub="${1:-}"
+    [[ -z "$sub" ]] && { usage; return 0; }
+    shift
+    case "$sub" in
+        deploy) cmd_deploy "$@" ;;
+        gather) cmd_gather "$@" ;;
+        fetch)  cmd_fetch "$@" ;;
+        list)   cmd_list ;;
+        -h|--help|help) usage ;;
+        *) echo "$(red 'error'): unknown subcommand '$sub'" >&2; usage; return 2 ;;
+    esac
+}
+
+main "$@"

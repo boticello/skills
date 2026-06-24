@@ -1,0 +1,13 @@
+# Provenance for vendored third-party skills (vendor/).
+#
+# Each entry records where a skill was fetched from and the exact commit it
+# was pinned to, so the skill is reproducible on a fresh machine even though
+# vendor/ itself is gitignored.
+#
+# Format:
+#   [skill-name]
+#   url = "https://github.com/owner/repo"
+#   commit = "<full sha>"
+#
+# Add entries automatically with:
+#   ./deploy/skills-deploy fetch owner/repo

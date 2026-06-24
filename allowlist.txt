@@ -1,0 +1,13 @@
+# Target entries that skills-deploy must NEVER remove.
+# One exact name or glob per line. Lines starting with # are comments.
+# These are managed by other systems (harness built-ins, plugins).
+
+# Codex built-in system skills (never touch)
+.system
+
+# brooks-lint plugin skills (managed by .agents/plugins/brooks-lint, symlinked)
+_shared
+brooks-*
+
+# Empty leftover from an old Codex runtime experiment
+codex-primary-runtime
