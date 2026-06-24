@@ -21,13 +21,20 @@ Edit a skill, then deploy:
 # Copy canonical → all harness targets (idempotent; skips unchanged)
 ./deploy/skills-deploy deploy
 
+# Deploy to a specific project instead of global (see Scoping below)
+./deploy/skills-deploy deploy --dest ~/Me/code/myproject
+
 # Preview what would change without writing
 ./deploy/skills-deploy deploy --dry-run
 ```
 
-Targets (never hand-edit — these are generated):
+Global targets (never hand-edit — these are generated):
 - `~/.agents/skills/` — ZCode, Zed, Warp, Memo, opencode-CLI
 - `~/.codex/skills/`  — Codex (`.system/` built-ins and plugin symlinks skipped)
+
+The global set is defined by `global-manifest.toml` (currently lists all
+skills as a baseline; to be curated down — see ticket `skills-2gs`). For
+project-scoped deployment, see [Scoping](#scoping-global-vs-project-skills).
 
 Re-running `deploy` with no changes touches nothing.
 
@@ -123,6 +130,27 @@ See [`docs/scoping-rationale.md`](docs/scoping-rationale.md) for the full
 reasoning behind why the global manifest lives in the repo (not in `~/.agents/`),
 why project manifests live in projects (not in the repo), and why there is no
 per-harness manifest.
+
+### Examples
+
+```bash
+# Global: mirror global-manifest.toml's set to home dirs
+./deploy/skills-deploy deploy
+
+# A code project that wants CBM but not personal/workflow skills
+cat > ~/Me/code/myproject/.agents/skills-manifest.toml <<'EOF'
+add = ["cbm"]
+exclude = ["shopping-management", "ticket-management"]
+EOF
+./deploy/skills-deploy deploy --dest ~/Me/code/myproject
+
+# Preview without writing
+./deploy/skills-deploy deploy --dest ~/Me/code/myproject --dry-run
+```
+
+A project with no manifest gets the bare global default. Skills not in the
+resolved set are removed from the project (backed up), so project dirs stay
+clean rather than accumulating drift.
 
 ## Craft Agents (manual — out of automation)
 

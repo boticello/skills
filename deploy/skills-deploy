@@ -32,6 +32,14 @@ ORIGINALS_DIR="$REPO_ROOT"
 VENDOR_DIR="$REPO_ROOT/vendor"
 ALLOWLIST="$REPO_ROOT/allowlist.txt"
 SOURCES="$REPO_ROOT/SOURCES.toml"
+GLOBAL_MANIFEST="$REPO_ROOT/global-manifest.toml"
+
+# A project carries its scoping preferences in a manifest at this path
+# (sibling to its skills/ dirs, never inside them).
+PROJECT_MANIFEST_REL=".agents/skills-manifest.toml"
+
+# Harness skills-subdir names that may exist at either scope (home or project).
+HARNESS_SKILLS_DIRS=(".agents/skills" ".codex/skills")
 
 # Top-level repo dirs that are NOT skill categories (skip when scanning).
 NON_CATEGORY_DIRS=(deploy vendor .skillkit .git)
@@ -62,12 +70,89 @@ red()    { color '31' "$1"; }
 cyan()   { color '36' "$1"; }
 dim()    { color '2'  "$1"; }
 
-targets() {
+# Resolve the harness skills dirs at a given scope (home or project root).
+# Emits absolute paths for every <root>/<harness>/skills that exists.
+# `root="$HOME"` → global; `root=/path/to/project` → that project's dirs.
+scope_targets() {
+    local root="$1" sub
+    for sub in "${HARNESS_SKILLS_DIRS[@]}"; do
+        echo "$root/$sub"
+    done
+}
+
+# Default global targets (home dirs). Overridable via SKILLS_TARGETS env.
+global_targets() {
     if [[ -n "${SKILLS_TARGETS:-}" ]]; then
         printf '%s\n' $SKILLS_TARGETS
     else
-        printf '%s\n' "${SKILLS_TARGETS_DEFAULT[@]}"
+        scope_targets "$HOME"
     fi
+}
+
+# Read the global manifest: list of canonical skill names that ship by default.
+# Falls back to ALL canonical skills if the manifest is missing or has no
+# `skills = [...]` list (so behaviour is "everything global" until curated).
+global_manifest_skills() {
+    if [[ ! -f "$GLOBAL_MANIFEST" ]]; then
+        canonical_skill_names | sort -u
+        return
+    fi
+    # Parse a TOML array of strings on a single `skills = [ ... ]` line.
+    # Handles multiline arrays by collapsing newlines first.
+    python3 -c "
+import re, sys
+txt = open('$GLOBAL_MANIFEST').read()
+m = re.search(r'(?s)^skills\s*=\s*\[(.*?)\]', txt, re.M)
+if not m:
+    sys.exit(0)  # no list → empty (fall through to caller)
+body = m.group(1)
+for q in re.findall(r'\"([^\"]+)\"', body):
+    print(q)
+" | sort -u
+}
+
+# Read a project manifest's add/exclude lists. Echoes two lines:
+#   line 1: space-separated add names
+#   line 2: space-separated exclude names
+# Empty manifest → empty add/exclude (project gets the bare global default).
+project_manifest() {
+    local manifest="$1"
+    [[ -f "$manifest" ]] || { echo ""; echo ""; return; }
+    python3 -c "
+import re, sys
+txt = open('$manifest').read()
+def names(field):
+    m = re.search(r'(?s)^' + field + r'\s*=\s*\[(.*?)\]', txt, re.M)
+    return re.findall(r'\"([^\"]+)\"', m.group(1)) if m else []
+print(' '.join(names('add')))
+print(' '.join(names('exclude')))
+"
+}
+
+# Resolve the skill set for a scope. Echoes one skill name per line.
+#   global mode:   global_manifest_skills
+#   project mode:  (global_manifest_skills - exclude) + add
+# Drops names that don't exist in canonical (typo guard).
+resolve_skill_set() {
+    local mode="$1" project_manifest_file="${2:-}"
+    local global add exclude
+    global="$(global_manifest_skills)"
+    if [[ "$mode" != "project" ]]; then
+        echo "$global"
+        return
+    fi
+    { read -r add; read -r exclude; } < <(project_manifest "$project_manifest_file")
+    python3 -c "
+import sys
+g = set('''$global'''.split())
+exclude = set('''$exclude'''.split())
+add = set('''$add'''.split())
+# (global - exclude) + add, filtered to canonical existence.
+canonical = set('''$(canonical_skill_names)'''.split())
+resolved = ((g - exclude) | add) & canonical
+for n in sorted(resolved):
+    print(n)
+"
 }
 
 # Read allowlist into a newline-separated string (strip comments/blanks).
@@ -168,71 +253,102 @@ new_backup_dir() {
 # ── Subcommand: deploy ─────────────────────────────────────────────────────
 
 cmd_deploy() {
-    local dry_run=0
-    [[ "${1:-}" == "--dry-run" ]] && dry_run=1
+    local dry_run=0 dest=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run) dry_run=1; shift ;;
+            --dest)    dest="$2"; shift 2 ;;
+            --dest=*)  dest="${1#*=}"; shift ;;
+            *) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
+        esac
+    done
 
-    local canonical; canonical="$(canonical_skill_names | sort -u)"
-    if [[ -z "$canonical" ]]; then
-        echo "$(red 'error'): no canonical skills found under $ORIGINALS_DIR or $VENDOR_DIR" >&2
-        return 1
+    # Resolve scope: global (default) or project (--dest).
+    local mode="global" scope_root="$HOME" manifest_file=""
+    if [[ -n "$dest" ]]; then
+        # Normalise to absolute path.
+        [[ "$dest" != /* ]] && dest="$PWD/$dest"
+        if [[ ! -d "$dest" ]]; then
+            echo "$(red 'error'): --dest project does not exist: $dest" >&2; return 1
+        fi
+        mode="project"
+        scope_root="$dest"
+        manifest_file="$dest/$PROJECT_MANIFEST_REL"
     fi
-    local canonical_count; canonical_count=$(echo "$canonical" | wc -l | tr -d ' ')
-    echo "$(cyan 'deploy'): $canonical_count canonical skill(s)"
+
+    # Resolve the skill set for this scope.
+    local resolved
+    resolved="$(resolve_skill_set "$mode" "$manifest_file")"
+    if [[ -z "$resolved" ]]; then
+        echo "$(red 'error'): resolved skill set is empty for $mode scope" >&2; return 1
+    fi
+    local resolved_count; resolved_count=$(echo "$resolved" | wc -l | tr -d ' ')
+
+    echo "$(cyan 'deploy') [$mode]: $resolved_count skill(s)"
+    if [[ "$mode" == "project" ]]; then
+        echo "  $(dim "project: $scope_root")"
+        if [[ -f "$manifest_file" ]]; then
+            echo "  $(dim "manifest: $manifest_file")"
+        else
+            echo "  $(dim "no project manifest — bare global default applies")"
+        fi
+    fi
     [[ $dry_run -eq 1 ]] && echo "$(dim '(dry-run — no changes written)')"
     echo
 
-    local target name src dest
+    local target name src dest_path
     local adds=0 updates=0 unchanged=0 removes=0 skipped_allow=0 skipped_link=0
 
     while IFS= read -r target; do
         [[ -n "$target" ]] || continue
         echo "$(cyan 'target'): $target"
 
-        # ── Copy/update each canonical skill into this target ──
+        # ── Copy/update each resolved skill into this target ──
         while IFS= read -r name; do
             [[ -n "$name" ]] || continue
             src="$(canonical_source_for "$name")"
-            dest="$target/$name"
+            [[ -z "$src" ]] && { echo "  $(red 'warn     ') $name not in canonical — skipping" >&2; continue; }
+            dest_path="$target/$name"
 
-            if [[ -L "$dest" ]]; then
+            if [[ -L "$dest_path" ]]; then
                 # Symlink in target — leave it (plugin-managed or hand-wired).
                 echo "  $(yellow 'skip-link ') $name"
                 skipped_link=$((skipped_link+1))
                 continue
             fi
 
-            if [[ ! -e "$dest" ]]; then
+            if [[ ! -e "$dest_path" ]]; then
                 if [[ $dry_run -eq 1 ]]; then
                     echo "  $(green 'add     ') $name"
                 else
-                    rsync -aL "${STRIP_EXCLUDES[@]}" "$src/" "$dest/"
+                    mkdir -p "$target"
+                    rsync -aL "${STRIP_EXCLUDES[@]}" "$src/" "$dest_path/"
                     echo "  $(green 'added   ') $name"
                 fi
                 adds=$((adds+1))
             else
-                # Detect whether rsync would change anything (works for both
-                # dry-run preview and live post-check) via --itemize-changes.
+                # Detect whether rsync would change anything via --itemize-changes.
                 local diff
                 diff="$(rsync -aL --delete --dry-run --itemize-changes --out-format='%n' \
-                            "${STRIP_EXCLUDES[@]}" "$src/" "$dest/" || true)"
+                            "${STRIP_EXCLUDES[@]}" "$src/" "$dest_path/" || true)"
                 if [[ -z "$diff" ]]; then
                     echo "  $(dim 'unchanged') $name"; unchanged=$((unchanged+1))
                 else
                     if [[ $dry_run -eq 1 ]]; then
                         echo "  $(yellow 'update   ') $name"
                     else
-                        rsync -aL --delete "${STRIP_EXCLUDES[@]}" "$src/" "$dest/"
+                        rsync -aL --delete "${STRIP_EXCLUDES[@]}" "$src/" "$dest_path/"
                         echo "  $(yellow 'updated ') $name"
                     fi
                     updates=$((updates+1))
                 fi
             fi
-        done <<< "$canonical"
+        done <<< "$resolved"
 
-        # ── Mirror cleanup: remove target skills not in canonical ──
-        while IFS= read -r name; do
+        # ── Mirror cleanup: remove target skills not in resolved set ──
+        [[ -d "$target" ]] && while IFS= read -r name; do
             [[ -n "$name" ]] || continue
-            if grep -qxF "$name" <<< "$canonical"; then
+            if grep -qxF "$name" <<< "$resolved"; then
                 continue   # managed skill
             fi
             if is_allowlisted "$name"; then
@@ -252,7 +368,7 @@ cmd_deploy() {
         done < <(target_real_skill_names "$target")
 
         echo
-    done < <(targets)
+    done < <(scope_targets "$scope_root")
 
     echo "$(cyan 'summary'): ${adds} added, ${updates} updated, ${unchanged} unchanged, ${removes} removed, ${skipped_allow} allowlisted, ${skipped_link} symlink-skipped"
 }
@@ -457,9 +573,15 @@ usage() {
 skills-deploy — manage canonical skills → harness targets
 
 Subcommands:
-  deploy [--dry-run]                 Copy canonical skills to all targets
-                                     (mirror: removes target skills not in canonical,
-                                      unless allowlisted; skips symlinks and .system)
+  deploy [--dry-run] [--dest <project>]
+                                     Mirror resolved skills to harness targets.
+                                     Without --dest: global scope (reads
+                                     global-manifest.toml) → ~/.agents/skills,
+                                     ~/.codex/skills.
+                                     With --dest <project>: project scope (reads
+                                     <project>/.agents/skills-manifest.toml) →
+                                     that project's harness dirs. Resolution is
+                                     (global_default - exclude) + add.
   gather <name> [--from codex|agents] [--category <cat>]
                                      Adopt a stray skill from a target into originals/
   fetch <owner/repo> [--skill <name>] [--list]
@@ -467,13 +589,17 @@ Subcommands:
   list                               Show canonical skills, targets, and allowlist
 
 Canonical store: ~/Me/repos/skills/
-  originals/<category>/<skill>/      your authored skills (git-tracked)
+  <category>/<skill>/                your authored skills (git-tracked)
   vendor/<skill>/                    third-party (gitignored)
+  global-manifest.toml               default set shipped globally
   SOURCES.toml                       provenance for vendor/
   allowlist.txt                      target entries never removed
 
+Project manifests:
+  <project>/.agents/skills-manifest.toml   add = [...], exclude = [...]
+
 Env:
-  SKILLS_TARGETS                     override default target dirs (space-separated)
+  SKILLS_TARGETS                     override GLOBAL target dirs (space-separated)
 EOF
 }
 
