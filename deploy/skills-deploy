@@ -210,19 +210,20 @@ cmd_deploy() {
                 fi
                 adds=$((adds+1))
             else
-                if [[ $dry_run -eq 1 ]]; then
-                    # Report whether it would change (rsync --dry-run --itemize-changes).
-                    local diff
-                    diff="$(rsync -aL --dry-run --itemize-changes --out-format='%n' \
-                                "${STRIP_EXCLUDES[@]}" "$src/" "$dest/" || true)"
-                    if [[ -z "$diff" ]]; then
-                        echo "  $(dim 'unchanged') $name"; unchanged=$((unchanged+1))
-                    else
-                        echo "  $(yellow 'update   ') $name"; updates=$((updates+1))
-                    fi
+                # Detect whether rsync would change anything (works for both
+                # dry-run preview and live post-check) via --itemize-changes.
+                local diff
+                diff="$(rsync -aL --delete --dry-run --itemize-changes --out-format='%n' \
+                            "${STRIP_EXCLUDES[@]}" "$src/" "$dest/" || true)"
+                if [[ -z "$diff" ]]; then
+                    echo "  $(dim 'unchanged') $name"; unchanged=$((unchanged+1))
                 else
-                    rsync -aL --delete "${STRIP_EXCLUDES[@]}" "$src/" "$dest/"
-                    echo "  $(yellow 'updated ') $name"
+                    if [[ $dry_run -eq 1 ]]; then
+                        echo "  $(yellow 'update   ') $name"
+                    else
+                        rsync -aL --delete "${STRIP_EXCLUDES[@]}" "$src/" "$dest/"
+                        echo "  $(yellow 'updated ') $name"
+                    fi
                     updates=$((updates+1))
                 fi
             fi
