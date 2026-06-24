@@ -102,6 +102,28 @@ Instructions for the agent...
 All target harnesses read this identical format — only the parent directory
 differs, so `deploy` is a flat copy with no translation.
 
+## Scoping: global vs project skills
+
+Not every skill belongs in every context. The deploy mechanism supports two
+scopes, each governed by a manifest:
+
+- **Global default** — `global-manifest.toml` (in this repo) defines the
+  universal set shipped to `~/.agents/skills/` and `~/.codex/skills/`.
+  `skills-deploy deploy` mirrors it.
+- **Project** — `proj/.agents/skills-manifest.toml` layers on top: `add` for
+  skills this project wants beyond global, `exclude` for global skills to
+  suppress here. `skills-deploy deploy --dest <project>` resolves
+  `(global - exclude + add)` and mirrors it into the project's harness dirs.
+
+Resolution is always `(global_default - exclude) + add` — additive by default,
+with surgical exclusions. One manifest per scope, fanned identically to all
+harness dirs at that scope.
+
+See [`docs/scoping-rationale.md`](docs/scoping-rationale.md) for the full
+reasoning behind why the global manifest lives in the repo (not in `~/.agents/`),
+why project manifests live in projects (not in the repo), and why there is no
+per-harness manifest.
+
 ## Craft Agents (manual — out of automation)
 
 Craft Agents is pull-based and workspace-scoped, not repo-local auto-loaded.
