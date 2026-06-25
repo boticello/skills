@@ -54,11 +54,12 @@ SKILLS_TARGETS_DEFAULT=(
 # Where deleted target skills get backed up (recoverable — never rm -rf).
 BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/skills-backups"
 
-# Files stripped on copy: skillkit/skillfish bookkeeping, not runtime-required.
+# Files/dirs stripped on copy: bookkeeping and VCS cruft, not runtime-required.
 STRIP_EXCLUDES=(
     --exclude='.DS_Store'
     --exclude='.skillkit.json'
     --exclude='.skillfish.json'
+    --exclude='.git'
 )
 
 # ── Helpers ────────────────────────────────────────────────────────────────
