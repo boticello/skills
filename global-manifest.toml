@@ -25,7 +25,7 @@ skills = [
     "cheatsheets",
     "clojure",
     "code-debug",
-    "code-intelligence",
+    "code-and-docs-search",
     "code-review",
     "concept-boundary-test",
     "concept-layer-synthesis",
