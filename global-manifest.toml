@@ -10,7 +10,7 @@
 # NOTE: adding a new skill to canonical requires adding it here too, or it
 # won't deploy globally. Run reconcile/deploy --dry-run to catch drift.
 
-# 79 skills (full canonical set)
+# 81 skills (full canonical set)
 skills = [
     "agent-commit-workflow",
     "agent-implementation-strategy",
@@ -18,12 +18,14 @@ skills = [
     "agent-vcs-workflow-with-jj",
     "almanac",
     "article-extractor",
+    "bin-creator",
     "br",
     "cbm",
     "change-manage",
     "cheatsheets",
     "clojure",
     "code-debug",
+    "code-intelligence",
     "code-review",
     "concept-boundary-test",
     "concept-layer-synthesis",
