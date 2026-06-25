@@ -7,9 +7,10 @@
 # reclassification ticket (skills-2gs) will curate this down to the truly
 # universal set incrementally.
 #
-# Regenerate with: ./deploy/skills-deploy list | ... (see commit/README)
+# NOTE: adding a new skill to canonical requires adding it here too, or it
+# won't deploy globally. Run reconcile/deploy --dry-run to catch drift.
 
-# 78 skills (full canonical set)
+# 79 skills (full canonical set)
 skills = [
     "agent-commit-workflow",
     "agent-implementation-strategy",
@@ -65,6 +66,7 @@ skills = [
     "ruby-code-analysis",
     "ship-learn-next",
     "shopping-management",
+    "skills-manage",
     "slice-retro",
     "slice-supervisor",
     "source-management",

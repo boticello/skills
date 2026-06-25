@@ -427,6 +427,105 @@ cmd_gather() {
     echo "  $(dim 'review, then commit. Run deploy to make the target a clean mirror.')"
 }
 
+# ── Subcommand: reconcile ──────────────────────────────────────────────────
+# Detect orphan drift (skills in targets but not in canonical) and gather all
+# strays in one pass. The bulk-drift cure; complement to single-skill `gather`.
+#
+# Handles ORPHAN drift only (skill exists in target, not in canonical). It does
+# NOT detect CONTENT drift (canonical skill edited differently in a target) —
+# that needs deliberate review.
+
+cmd_reconcile() {
+    local dry_run=0 dest="" category="personal"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run)  dry_run=1; shift ;;
+            --dest)     dest="$2"; shift 2 ;;
+            --dest=*)   dest="${1#*=}"; shift ;;
+            --category) category="$2"; shift 2 ;;
+            *) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
+        esac
+    done
+
+    # Resolve scope (mirror cmd_deploy's logic).
+    local mode="global" scope_root="$HOME" manifest_file=""
+    if [[ -n "$dest" ]]; then
+        [[ "$dest" != /* ]] && dest="$PWD/$dest"
+        [[ -d "$dest" ]] || { echo "$(red 'error'): --dest project does not exist: $dest" >&2; return 1; }
+        mode="project"; scope_root="$dest"
+        manifest_file="$dest/$PROJECT_MANIFEST_REL"
+    fi
+
+    local resolved
+    resolved="$(resolve_skill_set "$mode" "$manifest_file")"
+
+    # Collect strays: target skills not in resolved set, not allowlisted, not symlinks.
+    local -a strays=()
+    local target name
+    while IFS= read -r target; do
+        [[ -d "$target" ]] || continue
+        while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            grep -qxF "$name" <<< "$resolved" && continue      # managed skill
+            is_allowlisted "$name" && continue                  # allowlisted (.system, plugins)
+            [[ -L "$target/$name" ]] && continue                # symlink (plugin-managed)
+            strays+=("$name|$target")
+        done < <(target_real_skill_names "$target")
+    done < <(scope_targets "$scope_root")
+
+    if [[ ${#strays[@]} -eq 0 ]]; then
+        echo "$(green 'no drift'): no orphan skills detected in $mode scope"
+        return 0
+    fi
+
+    echo "$(cyan 'reconcile') [$mode]: ${#strays[@]} orphan skill(s) to gather"
+    [[ $dry_run -eq 1 ]] && echo "$(dim '(dry-run — no changes written)')"
+    echo
+
+    # De-duplicate strays by skill name (a stray may appear in both targets;
+    # gather once from the first target that has it).
+    # bash 3.2 (macOS) has no associative arrays — use a newline-separated string.
+    local seen="" entry sname target gathered=0
+    for entry in "${strays[@]}"; do
+        sname="${entry%%|*}"
+        grep -qxF "$sname" <<< "$seen" && continue
+        seen+="$sname"$'\n'
+
+        if [[ $dry_run -eq 1 ]]; then
+            echo "  $(yellow 'would gather') $sname  $(dim "→ $category/$sname")"
+        else
+            # Find the first target that actually has this skill.
+            target=""
+            while IFS= read -r t; do
+                [[ -f "$t/$sname/SKILL.md" ]] && target="$t/$sname" && break
+            done < <(scope_targets "$scope_root")
+            if [[ -z "$target" ]]; then
+                echo "  $(red 'error    ') $sname — SKILL.md not found in any target" >&2
+                continue
+            fi
+            local canon_dest="$ORIGINALS_DIR/$category/$sname"
+            if [[ -e "$canon_dest" ]]; then
+                echo "  $(yellow 'skip     ') $sname — already canonical (content drift; review manually)" >&2
+                continue
+            fi
+            mkdir -p "$(dirname "$canon_dest")"
+            rsync -aL "${STRIP_EXCLUDES[@]}" "$target/" "$canon_dest/"
+            echo "  $(green 'gathered ') $sname  $(dim "← $target → $category/$sname")"
+            gathered=$((gathered+1))
+        fi
+    done
+
+    if [[ $dry_run -eq 0 && $gathered -gt 0 ]]; then
+        echo
+        echo "$(dim 'gathered skills are in canonical but not yet deployed. Run:')"
+        if [[ -n "$dest" ]]; then
+            echo "$(dim "  ./deploy/skills-deploy deploy --dest \"$dest\"")"
+        else
+            echo "$(dim '  ./deploy/skills-deploy deploy')"
+        fi
+    fi
+}
+
 # ── Subcommand: fetch ──────────────────────────────────────────────────────
 # Acquire a third-party skill via git, record provenance. No skillfish involved.
 
@@ -585,6 +684,10 @@ Subcommands:
                                      (global_default - exclude) + add.
   gather <name> [--from codex|agents] [--category <cat>]
                                      Adopt a stray skill from a target into originals/
+  reconcile [--dry-run] [--dest <project>] [--category <cat>]
+                                     Gather ALL orphan skills (in targets but not
+                                     canonical) in one pass. The bulk-drift cure.
+                                     Handles orphan drift only, not content drift.
   fetch <owner/repo> [--skill <name>] [--list]
                                      Acquire a third-party skill into vendor/ via git
   list                               Show canonical skills, targets, and allowlist
@@ -611,10 +714,11 @@ main() {
     [[ -z "$sub" ]] && { usage; return 0; }
     shift
     case "$sub" in
-        deploy) cmd_deploy "$@" ;;
-        gather) cmd_gather "$@" ;;
-        fetch)  cmd_fetch "$@" ;;
-        list)   cmd_list ;;
+        deploy)    cmd_deploy "$@" ;;
+        gather)    cmd_gather "$@" ;;
+        reconcile) cmd_reconcile "$@" ;;
+        fetch)     cmd_fetch "$@" ;;
+        list)      cmd_list ;;
         -h|--help|help) usage ;;
         *) echo "$(red 'error'): unknown subcommand '$sub'" >&2; usage; return 2 ;;
     esac
