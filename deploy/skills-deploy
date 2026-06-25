@@ -254,10 +254,11 @@ new_backup_dir() {
 # ── Subcommand: deploy ─────────────────────────────────────────────────────
 
 cmd_deploy() {
-    local dry_run=0 dest=""
+    local dry_run=0 strict=0 dest=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dry-run) dry_run=1; shift ;;
+            --strict)  strict=1; shift ;;
             --dest)    dest="$2"; shift 2 ;;
             --dest=*)  dest="${1#*=}"; shift ;;
             *) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
@@ -286,6 +287,29 @@ cmd_deploy() {
     local resolved_count; resolved_count=$(echo "$resolved" | wc -l | tr -d ' ')
 
     echo "$(cyan 'deploy') [$mode]: $resolved_count skill(s)"
+
+    # Global scope only: warn if canonical has skills absent from global-manifest.
+    # These won't deploy globally (manifest is authoritative) — may be deliberate
+    # (project-add-only) or an oversight (footgun). --strict promotes to error.
+    if [[ "$mode" == "global" ]]; then
+        local manifest_missing
+        manifest_missing="$(comm -23 \
+            <(canonical_skill_names | sort -u) \
+            <(global_manifest_skills) 2>/dev/null)"
+        if [[ -n "$manifest_missing" ]]; then
+            local missing_count; missing_count=$(echo "$manifest_missing" | grep -c .)
+            if [[ $strict -eq 1 ]]; then
+                echo "$(red 'error'): $missing_count canonical skill(s) absent from global-manifest.toml (--strict)" >&2
+                echo "$manifest_missing" | sed 's/^/    /' >&2
+                echo "  Add them to global-manifest.toml, or deploy --dest <project> if they're project-only." >&2
+                return 1
+            else
+                echo "$(yellow 'warn'): $missing_count canonical skill(s) absent from global-manifest.toml (won't deploy globally; may be intentional):"
+                echo "$manifest_missing" | sed "s/^/    /" | sed "s/^/$(printf '\033[2m')/;s/$/$(printf '\033[0m')/" >&2
+            fi
+        fi
+    fi
+
     if [[ "$mode" == "project" ]]; then
         echo "  $(dim "project: $scope_root")"
         if [[ -f "$manifest_file" ]]; then
@@ -673,7 +697,7 @@ usage() {
 skills-deploy — manage canonical skills → harness targets
 
 Subcommands:
-  deploy [--dry-run] [--dest <project>]
+  deploy [--dry-run] [--strict] [--dest <project>]
                                      Mirror resolved skills to harness targets.
                                      Without --dest: global scope (reads
                                      global-manifest.toml) → ~/.agents/skills,
@@ -682,6 +706,8 @@ Subcommands:
                                      <project>/.agents/skills-manifest.toml) →
                                      that project's harness dirs. Resolution is
                                      (global_default - exclude) + add.
+                                     --strict: error if canonical skills are
+                                     absent from global-manifest.toml (else warn).
   gather <name> [--from codex|agents] [--category <cat>]
                                      Adopt a stray skill from a target into originals/
   reconcile [--dry-run] [--dest <project>] [--category <cat>]
