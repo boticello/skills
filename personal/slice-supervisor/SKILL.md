@@ -305,7 +305,7 @@ To include the Reflection section: copy the `## Reflection` paragraph from the p
 
 | Role | Skill | Model | Connection | Thinking | Permission | Prompt template |
 |------|-------|-------|------------|----------|------------|----------------|
-| **Supervisor** | `@slice-supervisor`, `@ticket-management` | `pi/gpt-5.5` | `chatgpt-plus` | medium | allow-all | `prompts/supervisor-prompt.md` |
+| **Supervisor** | `@slice-supervisor`, `@br` | `pi/gpt-5.5` | `chatgpt-plus` | medium | allow-all | `prompts/supervisor-prompt.md` |
 | Discovery | `@discovery-architect` | `pi/glm-5.1` | `pi-api-key` | medium | allow-all | `prompts/discovery-prompt.md` |
 | Planner | `@go-slice-planner` | `pi/glm-5.1` | `pi-api-key` | high | allow-all | `prompts/planner-prompt.md` |
 | Implementer | `@go-slice-implementer` | `pi/glm-5.1` | `pi-api-key` | low | allow-all | `prompts/implementer-prompt.md` |
@@ -589,9 +589,9 @@ Step 10: Triage retro findings and report to the human
   Actions:
   - **Act now**: edit the target skill/template file in ~/Me/00-system/agents/skills/,
     then cp -r to ~/.agents/skills/ to redeploy. Report what you changed.
-  - **Defer**: create a ticket via `me tk create` with kind, priority, and a description
+  - **Defer**: create an issue via `br create` with priority, type, and a description
     that includes the synthesis context (what was learned, where to encode it).
-    Use the ticket-management skill for correct lifecycle handling.
+    Use the br skill for correct lifecycle handling.
   - **Note**: append the item to {{RETRO_DIR}}/deferred-learnings.md.
   - **Ignore**: only if the item is superseded or inapplicable. Say why.
 

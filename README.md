@@ -73,7 +73,7 @@ afterward to make the target a clean mirror.
 
 ## What's here
 
-80 skills across 13 categories:
+75 skills across 13 categories:
 
 | Category | Skills |
 |----------|--------|
@@ -84,8 +84,8 @@ afterward to make the target a clean mirror.
 | **go-slice** | go-slice-implementer, go-slice-planner, go-slice-reviewer, slice-retro |
 | **knowledge-management** | documentation-writing, documentation-writer, typst |
 | **languages** | clojure, fsharp, nushell, ruby |
-| **personal** | change-manage, concept-boundary-test, concept-layer-synthesis, feature-build, filing-process, jot-capture, lark-crm, location-manage, me-feature-build, orientate, project-manage, shopping-management, slice-supervisor, source-management, subscription-management, system-self-care, ticket-audit, ticket-find, ticket-management, zcode |
-| **planning** | discovery-architect, feature-handoff, orchestration, plan, spike-planning, ticket-closedown, update-docs, wrap, write-design-doc |
+| **personal** | change-manage, concept-boundary-test, concept-layer-synthesis, feature-build, filing-process, jot-capture, lark-crm, location-manage, orientate, project-manage, shopping-management, slice-supervisor, source-management, subscription-management, system-self-care, zcode |
+| **planning** | discovery-architect, feature-handoff, orchestration, plan, spike-planning, update-docs, wrap, write-design-doc |
 | **review** | code-review, remind-management, retro, verify |
 | **tools** | almanac, br, cbm, cheatsheets, database-migration, fs-reorg, tool-eval, troubleshoot-codex |
 | **vcs** | git-change-manage, git-vcs, jj-change-manage, jj-vcs, work-unit-manage |
@@ -140,7 +140,7 @@ per-harness manifest.
 # A code project that wants CBM but not personal/workflow skills
 cat > ~/Me/code/myproject/.agents/skills-manifest.toml <<'EOF'
 add = ["cbm"]
-exclude = ["shopping-management", "ticket-management"]
+exclude = ["shopping-management", "lark-crm"]
 EOF
 ./deploy/skills-deploy deploy --dest ~/Me/code/myproject
 

@@ -17,11 +17,11 @@ exclude_tools:
 
 Use this skill for broader orientation sessions across the `me` system.
 
-## Relationship To `ticket-audit`
+## Relationship To `br` audit
 
 This is the broader orientation skill.
 
-Use [`ticket-audit`](/Users/bear/Me/00-system/agents/skills/ticket-audit/SKILL.md) for:
+Use the [`br`](tools/br) issue tracker's audit surface (`br ready`, `br blocked`, `br stale`, `br lint`) for:
 - focused ticket audit
 - backlog hygiene
 - ticket-state diagnosis
@@ -62,7 +62,7 @@ An orientation pass may focus on one or more of:
 1. Define the scope of the orientation pass.
 2. Create or identify a ticket when the pass is a substantial session, recurring orientation practice, or part of tracked system work.
 3. Pull the source sets needed for that scope: tickets, projects, jots, and any other relevant context.
-4. Use [`ticket-audit`](/Users/bear/Me/00-system/agents/skills/ticket-audit/SKILL.md) explicitly when ticket audit is one orientation lens rather than the whole job.
+4. Use [`br`](tools/br) audit commands (`br ready`, `br blocked`, `br stale`, `br lint`) explicitly when ticket audit is one orientation lens rather than the whole job.
 5. Inspect notable items in detail.
 6. Look for cross-source patterns, not just isolated ticket comments.
 7. Summarise findings into a small number of clear actions or decisions.
@@ -86,7 +86,7 @@ An orientation pass may focus on one or more of:
 - If the pass reveals a system design gap, say so explicitly.
 - Use `me jot` for reflections that should survive beyond the session.
 - Use ticket notes for orientation scope, major findings, and chosen follow-up when the pass is part of an auditable workstream.
-- If the task is only ticket audit or backlog hygiene, use [`ticket-audit`](/Users/bear/Me/00-system/agents/skills/ticket-audit/SKILL.md) instead of widening into a full `orientate`.
+- If the task is only ticket audit or backlog hygiene, use [`br`](tools/br) audit commands (`br ready`, `br stale`, `br lint`) instead of widening into a full `orientate`.
 - If the task is about tending drift, boundaries, and corpus health inside the governance memory system, use [`system-self-care`](/Users/bear/Me/00-system/agents/skills/system-self-care/SKILL.md).
 
 ## Good patterns

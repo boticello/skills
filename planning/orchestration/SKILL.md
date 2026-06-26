@@ -48,8 +48,8 @@ oracle protocol skills.
    system thread.
 3. If the request has become durable work, apply
    [Work Boundary Detection](#work-boundary-detection).
-4. If ticket operations are needed, use
-   [ticket-management](../ticket-management/SKILL.md).
+4. If issue/tracker operations are needed, use
+   [`br`](../../tools/br).
 5. If document/content operations are needed, use the future
    `document-management` skill. Until that exists, follow local documentation
    rules and state provisional placement decisions.

@@ -364,4 +364,5 @@ RUST_LOG=debug br list       # Detailed trace logs
 | Command cookbook | [references/COMMANDS.md](references/COMMANDS.md) |
 | Configuration details | [references/CONFIG.md](references/CONFIG.md) |
 | Troubleshooting guide | [references/TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) |
+| Closedown ceremony (clean close with durable record) | [references/CLOSEDOWN.md](references/CLOSEDOWN.md) |
 | Multi-agent integration | [references/INTEGRATION.md](references/INTEGRATION.md) |

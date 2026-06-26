@@ -1,7 +1,0 @@
-interface:
-  display_name: "Ticket Management"
-  short_description: "Work through ticket lifecycles safely"
-  default_prompt: "Use $ticket-management to start, resume, checkpoint, close, or reopen this ticket safely."
-
-policy:
-  allow_implicit_invocation: true

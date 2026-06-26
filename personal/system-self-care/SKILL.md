@@ -26,7 +26,7 @@ Use `system-self-care` when the question is:
 - where is drift accumulating in notes, tickets, skills, jots, micro-docs, or operating guidance?
 - what needs to be clarified, consolidated, promoted, revised, or retired?
 
-Use [`ticket-audit`](/Users/bear/Me/00-system/agents/skills/ticket-audit/SKILL.md) when the job is narrower ticket diagnosis and backlog hygiene.
+Use the [`br`](tools/br) issue tracker's audit surface (`br ready`, `br blocked`, `br stale`, `br lint`) when the job is narrower ticket diagnosis and backlog hygiene.
 
 Use [`orientate`](/Users/bear/Me/00-system/agents/skills/orientate/SKILL.md) when the job is broader orientation across several source types in service of `What? So what? Now what?`.
 
@@ -112,7 +112,7 @@ Questions to ask:
 - Favour promoting repeated useful patterns into durable guidance.
 - Do not create new artefacts unless a distinct new note, ticket, skill, automation, or capability is genuinely warranted.
 - If the real need is user situating rather than system tending, widen into [`orientate`](/Users/bear/Me/00-system/agents/skills/orientate/SKILL.md) instead of forcing orientation into self-care.
-- If the real need is narrower ticket diagnosis, use [`ticket-audit`](/Users/bear/Me/00-system/agents/skills/ticket-audit/SKILL.md) rather than a full self-care pass.
+- If the real need is narrower ticket diagnosis, use the [`br`](tools/br) audit commands (`br ready`, `br stale`, `br lint`) rather than a full self-care pass.
 
 ## Good patterns
 
