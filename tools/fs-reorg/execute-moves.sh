@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/opt/homebrew/bin/bash
 # execute-moves.sh — declarative filesystem reorganisation
 #
 # Reads a tab-separated move plan (moves.tsv) and executes it safely:
@@ -27,16 +27,20 @@ MOVES="$ROOT/moves.tsv"
 TRASH_DEFAULT="$HOME/Me/trash"
 DRY_RUN=false
 TRASH_DIR_OVERRIDE=""
+TRASH_SUBDIR_OVERRIDE=""  # when set, skip the doc-reorg-<timestamp> subdir and use this name instead
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run)   DRY_RUN=true; shift ;;
-    --trash-dir) TRASH_DIR_OVERRIDE="$2"; shift 2 ;;
+    --dry-run)              DRY_RUN=true; shift ;;
+    --trash-dir)            TRASH_DIR_OVERRIDE="$2"; shift 2 ;;
+    --trash-subdir)         TRASH_SUBDIR_OVERRIDE="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: bash execute-moves.sh [--dry-run] [--trash-dir <path>]"
+      echo "Usage: bash execute-moves.sh [--dry-run] [--trash-dir <path>] [--trash-subdir <name>]"
       echo ""
       echo "Reads moves.tsv from the script's directory."
       echo "Default trash root: $TRASH_DEFAULT"
+      echo "Default trash subdir: doc-reorg-<timestamp> (e.g. doc-reorg-20260528-083427)"
+      echo "  Use --trash-subdir to override (e.g. --trash-subdir 2026-06-29 to merge into a date folder)"
       exit 0
       ;;
     *) echo "Unknown option: $1"; exit 1 ;;
@@ -109,8 +113,19 @@ for i in "${!SOURCES[@]}"; do
   fi
 
   if [[ -f "$full_dst" ]]; then
-    echo "  CONFLICT: $dst already exists"
-    FAILED=$((FAILED + 1))
+    # Same path → trash-only operation. Skip the copy (the file is
+    # already at the destination by definition). The Phase 4 mv will
+    # move the source to the trash dir.
+    if [[ "$(realpath "$full_src" 2>/dev/null)" == "$(realpath "$full_dst" 2>/dev/null)" ]]; then
+      if $DRY_RUN; then
+        echo "  [dry-run] (no-op, source==dest) $src"
+      else
+        echo "  (no-op, source==dest) $src"
+      fi
+    else
+      echo "  CONFLICT: $dst already exists"
+      FAILED=$((FAILED + 1))
+    fi
     continue
   fi
 
@@ -167,8 +182,12 @@ fi
 
 echo ""
 echo "--- Phase 4: trashing originals ---"
-TRASH_TS="$(date +%Y%m%d-%H%M%S)"
-TRASH_DIR="$TRASH_ROOT/doc-reorg-$TRASH_TS"
+if [[ -n "$TRASH_SUBDIR_OVERRIDE" ]]; then
+  TRASH_DIR="$TRASH_ROOT/$TRASH_SUBDIR_OVERRIDE"
+else
+  TRASH_TS="$(date +%Y%m%d-%H%M%S)"
+  TRASH_DIR="$TRASH_ROOT/doc-reorg-$TRASH_TS"
+fi
 
 if $DRY_RUN; then
   echo "  [dry-run] trash dir: $TRASH_DIR"
@@ -196,7 +215,16 @@ for i in "${!SOURCES[@]}"; do
     continue
   fi
 
-  trash_dest="$TRASH_DIR/$src"
+  # Build trash path. If $src starts with "../.." (the staging-dir layout
+  # convention), strip those components and rebase under $TRASH_DIR. This
+  # avoids the bug where $ROOT/$src and $TRASH_DIR/$src resolve to the
+  # same absolute path (when $TRASH_DIR is at the same depth as $ROOT).
+  # See the 2026-06-29 Klick & Sketch incident for context.
+  trash_subpath="$src"
+  while [[ "$trash_subpath" == ../* ]]; do
+    trash_subpath="${trash_subpath#../}"
+  done
+  trash_dest="$TRASH_DIR/$trash_subpath"
   trash_dest_dir="$(dirname "$trash_dest")"
   mkdir -p "$trash_dest_dir"
   mv "$full_src" "$trash_dest"
@@ -231,4 +259,7 @@ if $DRY_RUN; then
 else
   echo "=== Done. $TOTAL moves completed. ==="
   echo "    originals at: $TRASH_DIR"
+  if [[ -n "$TRASH_SUBDIR_OVERRIDE" ]]; then
+    echo "    (merged into date-folder convention; no separate doc-reorg-<timestamp> subdir)"
+  fi
 fi

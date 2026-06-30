@@ -39,13 +39,43 @@ If unsure, it's standalone. Repo-coupling is an explicit pattern (`resolve_scrip
 
 ### 2. Pick the language
 
-| Language | Use when |
-|---|---|
-| **Bash** | Glue: composing other commands, file moves, wrapping one tool. Trivial logic. |
-| **Ruby** | Anything with real logic, data structures, JSON/YAML parsing, multiple code paths. Your existing `scripts/bin` is mostly Ruby for this reason. Shebang `#!/usr/bin/env ruby`. |
-| **Zsh** | Only when you specifically need zsh features (existing `ts-ruby-*` use it). Prefer Bash otherwise. |
+| Language | Use when | Shebang |
+|---|---|---|
+| **Bash** | Glue: composing other commands, file moves, wrapping one tool. Trivial logic. | `#!/opt/homebrew/bin/bash` |
+| **Ruby** | Anything with real logic, data structures, JSON/YAML parsing, multiple code paths. Your existing `scripts/bin` is mostly Ruby for this reason. | `#!/usr/bin/env ruby` |
+| **Zsh** | Only when you specifically need zsh features (existing `ts-ruby-*` use it). Prefer Bash otherwise. | `#!/opt/homebrew/bin/zsh` (if installed) or `#!/usr/bin/env zsh` |
 
 Default to **Ruby for logic, Bash for glue.**
+
+**Shebang rule: use the absolute homebrew path for any shell script
+you author.** This is the single most important line in the script. See
+"Shebangs" below for why.
+
+#### Shebangs — why absolute paths, not `env`
+
+On macOS, `/bin/bash` is Apple-shipped bash **3.2** (the last GPLv2
+version). It does not support `declare -A` (associative arrays),
+`${var,,}` (lowercase parameter expansion), `read -d ''`, or other
+bash 4+ features. Bash 5.3 is at `/opt/homebrew/bin/bash`.
+
+Three patterns and their tradeoffs:
+
+| Shebang | Pros | Cons |
+|---|---|---|
+| `#!/opt/homebrew/bin/bash` | **Recommended.** Hardcoded path, no PATH lookup, no `env` failure modes. Works regardless of how the caller resolves `bash`. | Hardcodes a path; if homebrew moves (e.g. to `/usr/local` on Intel Macs), the script breaks. |
+| `#!/usr/bin/env bash` | Portable across systems. | Depends on the caller's PATH having a usable `bash` first. On macOS without `/etc/paths.d/homebrew` configured, `env` finds `/bin/bash` 3.2. |
+| `#!/bin/bash` | Always works. | Always 3.2. New bash syntax will fail. |
+
+For this user's environment: homebrew is at `/opt/homebrew`, modern
+bash 5.3 is installed, and `/etc/paths.d/homebrew` is configured
+(verified 2026-06-29). Use `#!/opt/homebrew/bin/bash` for new scripts
+and the convention will Just Work.
+
+If a script is genuinely meant to be portable to other macOS systems
+without homebrew, use `#!/usr/bin/env bash` AND stick to bash 3.2
+syntax. But that's a rare requirement.
+
+**Do not add self-reexec guards** (the `if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then exec /opt/homebrew/bin/bash "$0" "$@"; fi` pattern) to scripts. They work but obscure the shebang issue. Fix the shebang once, in one place; don't add run-time ceremony to every script.
 
 ### 3. Pick the name (kebab-case, no extension)
 

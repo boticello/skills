@@ -86,6 +86,7 @@ The `moves.tsv` file and any surrounding scaffolding can be removed or kept as a
 |---|---|
 | `--dry-run` | Preview all phases without making changes |
 | `--trash-dir <path>` | Override the trash root (default: `~/Me/trash`) |
+| `--trash-subdir <name>` | Override the timestamped subdir; useful for merging into a date-folder convention (e.g. `--trash-subdir 2026-06-29`) |
 
 ## Troubleshooting
 
@@ -96,6 +97,10 @@ The `moves.tsv` file and any surrounding scaffolding can be removed or kept as a
 **"CONFLICT" errors in Phase 2**: A destination file already exists. The script will not overwrite. Either remove the existing destination, or update the plan to avoid the conflict.
 
 **Empty directories not cleaned up**: The cleanup phase only removes directories that are empty after moves. If a directory still contains files not listed in the plan, it is preserved.
+
+**Phase 4 "succeeded" but nothing landed in the trash**: This is a path-resolution bug. The script computes `mv "$ROOT/$src" "$TRASH_DIR/$src"`. If both `$ROOT` and `$TRASH_DIR` are at the same depth (e.g. both directly under `~/Me/`), and `$src` starts with `../../`, both `full_src` and `trash_dest` resolve to the **same absolute path**. BSD `mv` treats `mv X X` as a successful no-op (exit 0), so `set -euo pipefail` doesn't trip. Fix: the current script (as of 2026-06-29) strips the leading `../` from `$src` when building the trash path, so `../../inbox/foo.pdf` becomes `inbox/foo.pdf` under the trash dir. If you're seeing this, upgrade to the latest version of the script. **Verify by computing `realpath` of both `full_src` and `trash_dest` before any real run.**
+
+**Trash looks empty after a "successful" run**: Same as above. Check `trash/<subdir>/inbox/...` — the files may have moved there. But on macOS with the default `~/Me/trash/<subdir>/` layout, this means they didn't move at all. See the previous item.
 
 ## Known Limitations
 
