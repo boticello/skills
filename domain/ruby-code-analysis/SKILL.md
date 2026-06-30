@@ -25,7 +25,7 @@ Four layers:
 
 ## Workflow
 - Always use tree-sitter before grep
-- Always run from the project root: `cd ~/Me/00-system/tools/cli`
+- Always run from the project root of the Ruby project you are analysing (e.g. `cd <project-root>`)
 
 ### 1. Map the unfamiliar file structure
 

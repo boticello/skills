@@ -83,7 +83,7 @@ Accept file paths or structured data via pipeline
   errors: []
 }
 
-3. Error Handling and Guardrails
+## 3. Error Handling and Guardrails
 Use do and try Blocks
 do { 
   # ... operation ...
@@ -139,7 +139,7 @@ def log [level: string, msg: string, extra?: record] {
   } | to json -p | print
 }
 
-4. Using Unix Tools (When Helpful)
+## 4. Using Unix Tools (When Helpful)
 When to Use Unix Tools
 
 Prefer Nushell but use Unix tools for:
@@ -157,7 +157,7 @@ rg -n --json 'ERROR' logs/
   | from json 
   | select type data.path data.line_number data.lines.text
 
-5. Patterns and Examples
+## 5. Patterns and Examples
 5.1 Text Conversion Agent (CSV → Normalized CSV)
 # file: agents/agent-csv-normalize.nu
 
@@ -356,7 +356,7 @@ def agent-txt-convert [
   }
 }
 
-6. Testing
+## 6. Testing
 
 Use nu's std assert, snapshot testing via saved fixtures, and deterministic inputs.
 
@@ -413,7 +413,7 @@ let expected = open tests/fixtures/json/expected.json
 use std assert
 assert equal $actual $expected
 
-7. Common Utilities (Factorization)
+## 7. Common Utilities (Factorization)
 
 Create agents/_common.nu and agents/_logging.nu to share guards and logging.
 
@@ -457,18 +457,18 @@ Usage in Agents
 source agents/_common.nu
 source agents/_logging.nu
 
-8. Performance and Large Files
+## 8. Performance and Large Files
 Prefer streaming reads: open --raw | lines for raw text; open | from csv/json for structured where feasible
 Use each --keep-env --parallel for CPU-bound transforms cautiously; ensure order doesn't matter
 For massive CSV: Consider chunking with split-by or external tools (mlr, xsv) then reassemble
 Avoid to json on giant tables unless required; prefer hash md5 on smaller canonical representations if needed
-9. Security and Safety
+## 9. Security and Safety
 Never write secrets to logs. When logging records, redact known secret keys: update api_key { |v| "***redacted***" }
 Validate paths to prevent directory traversal; restrict writes to known output directories
 Use atomic writes via temp files + mv -f
 Do not execute external commands on untrusted input without sanitization
 Be explicit about encodings; avoid silent conversions
-10. Examples: End-to-End
+## 10. Examples: End-to-End
 Normalize CSV, Then Convert to Parquet
 source agents/agent-csv-normalize.nu
 source agents/agent-json-to-parquet.nu
@@ -488,18 +488,18 @@ source agents/agent-txt-convert.nu
 
 agent-txt-convert --dir notes/ --pattern "*.md" --apply false | first 5
 
-11. Maintenance
+## 11. Maintenance
 Document each agent's inputs/outputs and examples in its file header
 Keep fixtures up to date with real-world edge cases
 Add regression tests whenever a bug is fixed
 Version agents by tagging commits and noting format changes in CHANGELOG
-12. Troubleshooting
+## 12. Troubleshooting
 Issue	Solution
 "Parquet not available"	Check help commands | where command == "to parquet". Install Nushell with parquet feature or fallback to CSV.
 "Schema mismatch"	Inspect columns and use guard-schema to add clear messages.
 "Large file slow"	Switch to streaming conversions or use xsv/mlr to pre-process, then return to Nushell for structured steps.
 "Unicode issues"	Set --encoding explicitly and normalize with into string --encoding utf-8.
-13. Style Guide
+## 13. Style Guide
 Use descriptive names: prefer snake_case for variables and kebab-case for command files
 Comment why, not just what. Include data shape assumptions.
 Keep functions small; compose with pipes

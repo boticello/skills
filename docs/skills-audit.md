@@ -1,7 +1,7 @@
 # Skills Audit (2026-06-30)
 
-A facet-based assessment of the canonical skill set (~77 skills). Produced to
-drive reclassification (`skills-2gs`), quality control / triggering
+A facet-based assessment of the canonical skill set. Produced to drive
+reclassification (`skills-2gs`), quality control / triggering
 (`skills-2lm`), and the retirement / salvage decisions after the me-CLI
 ticket cluster was removed (commit `7cd33c1`; preserved on branch
 `archive/me-cli`).
@@ -9,6 +9,15 @@ ticket cluster was removed (commit `7cd33c1`; preserved on branch
 This is an **assessment of the landscape** to inform decisions, not a
 prescription. The user makes the calls; this document surfaces the
 structure so those calls are well-grounded.
+
+> **Status.** Assessed against ~77 skills (post me-CLI retirement).
+> **Phase 0 complete** (commit following this audit): retired `code-debug`,
+> `plan`, `documentation-writing`; fixed isolated defects in `ruby`,
+> `nushell`, `pharmaceutical-definition-creator`, `ruby-code-analysis`,
+> `system-self-care`; `clojure` trim deferred to its own ticket. The
+> `filesearch` skill (added independently during the audit window) is a
+> well-built, sharp-triggered skill and folds into the active set without
+> changes. Current canonical count: 73 tracked skills.
 
 ---
 

@@ -315,5 +315,5 @@ Plain prose sentences only — no bullet points. Each rule on its own line.
 
 | File | Load when |
 |---|---|
-| `references/chisholm.md` | Using Chisholm method — contains full 22-item checklist and three worked examples |
-| `references/intralign.md` | Using Intralign method — contains full grammar rules, ambiguity checklist, and five worked examples |
+| `chisholm.md` | Using Chisholm method — contains full 22-item checklist and three worked examples |
+| `intralign.md` | Using Intralign method — contains full grammar rules, ambiguity checklist, and five worked examples |

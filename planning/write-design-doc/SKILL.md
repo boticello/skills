@@ -1,6 +1,6 @@
 ---
 name: write-design-doc
-description: Use when producing a technical design document, RFC, architecture proposal, implementation design, system design, or design review for non-trivial engineering work, especially when the work spans multiple components, has multiple possible approaches, needs explicit trade-offs, involves rollout/migration risk, or will guide implementation by humans or subagents. Prefer this over general documentation-writing for engineering design docs.
+description: Use when producing a technical design document, RFC, architecture proposal, implementation design, system design, or design review for non-trivial engineering work, especially when the work spans multiple components, has multiple possible approaches, needs explicit trade-offs, involves rollout/migration risk, or will guide implementation by humans or subagents. Prefer this over general documentation-writer for engineering design docs.
 ---
 
 # Write Design Doc

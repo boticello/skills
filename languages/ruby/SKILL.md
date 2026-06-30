@@ -188,85 +188,31 @@ Explain domain knowledge that might not be obvious to future maintainers.
 
 **Example**:
 ```ruby
-# Contract validation follows RFC 5322 email format but allows
-# some common variations found in legacy customer data
-class EmailValidator  FRAUD_THRESHOLD
-      # High-risk transactions require manual review per company policy
-      queue_for_manual_review(transaction, fraud_score)
-      return create_pending_result(transaction)
-    end
+# Validates addresses against RFC 5322, but relaxes a few rules to accept
+# quirks present in legacy customer data (e.g., quoted local parts, unquoted
+# dots). A stricter parser would reject ~3% of our paying customers' records.
+class EmailValidator
+  def valid?(email)
+    return false if email.nil? || email.strip.empty?
 
-    execute_transaction(transaction)
+    local_part, _, domain = email.partition('@')
+    return false if local_part.empty? || domain.empty?
+
+    valid_local_part?(local_part) && valid_domain?(domain)
   end
 
-  def calculate_fraud_risk(transaction)
-    # Proprietary algorithm considers:
-    # - Transaction velocity (multiple transactions in short time)
-    # - Geographic anomalies (transactions from unusual locations)
-    # - Amount patterns (unusual spending patterns for this customer)
-    # - Device fingerprinting (new or suspicious devices)
+  private
 
-    base_score = analyze_transaction_velocity(transaction)
-    geographic_risk = analyze_geographic_patterns(transaction)
-    amount_risk = analyze_spending_patterns(transaction)
+  # RFC 5322 permits quoted local parts ("john..doe"@example.com) that look
+  # invalid at a glance; legacy imports rely on them, so we keep them allowed.
+  def valid_local_part?(local_part)
+    return true if local_part.start_with?('"') && local_part.end_with?('"')
 
-    # Weighted scoring based on historical fraud correlation analysis
-    (base_score * 0.4) + (geographic_risk * 0.3) + (amount_risk * 0.3)
+    local_part.match?(/\A[a-zA-Z0-9._%+-]+\z/)
   end
 
-  def validate_transaction(transaction)
-    contract = TransactionContract.new
-    result = contract.call(transaction)
-
-    # Additional business rule validation beyond schema validation
-    # These rules change frequently based on regulatory updates
-    if result.success?
-      validate_business_rules(transaction)
-    else
-      result
-    end
-  end
-
-  def validate_business_rules(transaction)
-    # Daily transaction limits vary by customer tier and account age
-    # Premium customers have higher limits, new accounts have restrictions
-    daily_limit = calculate_daily_limit(transaction[:customer_id])
-
-    if exceeds_daily_limit?(transaction, daily_limit)
-      Failure("Transaction exceeds daily limit of #{daily_limit}")
-    else
-      Success(transaction)
-    end
-  end
-
-  # Compliance reporting required by financial regulators
-  # Must include specific metrics and be generated in standardized format
-  def generate_compliance_report
-    report_data = {
-      total_processed: @processed_transactions.count,
-      total_amount: calculate_total_amount,
-      fraud_detected: count_fraud_cases,
-      processing_time: Time.current,
-      # Include additional metrics required by regulatory framework
-      average_transaction_size: calculate_average_transaction_size,
-      geographic_distribution: analyze_geographic_distribution
-    }
-
-    @audit_logger.log_compliance_report(report_data)
-  end
-end
-
-class TransactionContract  10_000
-      key.failure('large transactions require pre-authorization')
-    end
-  end
-
-  # Validate that the card token hasn't been used in suspicious patterns
-  # Prevents replay attacks and token abuse
-  rule(:card_token) do
-    if recently_used_token?(value)
-      key.failure('card token shows suspicious usage pattern')
-    end
+  def valid_domain?(domain)
+    domain.match?(/\A[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\z/)
   end
 end
 ```

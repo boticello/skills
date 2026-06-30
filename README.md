@@ -73,16 +73,16 @@ afterward to make the target a clean mirror.
 
 ## What's here
 
-75 skills across 13 categories:
+73 skills across 13 categories:
 
 | Category | Skills |
 |----------|--------|
 | **agent-workflow** | agent-commit-workflow, agent-implementation-strategy, agent-task-boundaries, agent-vcs-workflow-with-jj, supervisor |
 | **analysis** | file-introspection |
-| **debug** | code-debug, root-cause-debugger |
+| **debug** | root-cause-debugger |
 | **domain** | pharmaceutical-definition-creator, ruby-code-analysis |
 | **go-slice** | go-slice-implementer, go-slice-planner, go-slice-reviewer, slice-retro |
-| **knowledge-management** | documentation-writing, documentation-writer, typst |
+| **knowledge-management** | documentation-writer, typst |
 | **languages** | clojure, fsharp, nushell, ruby |
 | **personal** | change-manage, concept-boundary-test, concept-layer-synthesis, feature-build, filing-process, jot-capture, lark-crm, location-manage, orientate, project-manage, shopping-management, slice-supervisor, source-management, subscription-management, system-self-care, zcode |
 | **planning** | discovery-architect, feature-handoff, orchestration, plan, spike-planning, update-docs, wrap, write-design-doc |

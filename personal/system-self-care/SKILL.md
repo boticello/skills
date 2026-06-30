@@ -121,7 +121,7 @@ me tk list --path 00-system --status open
 me search "skills architecture"
 me jot list -k reflection -n 20
 rg -n "authority map|context bundle|self-care|orientation" ~/Me/00-system/areas
-fd . ~/Me/Me/00-system/tools/cli/docs/micro
+fd . ~/Me/00-system/tools/cli/docs/micro
 ```
 
 ## Output pattern
