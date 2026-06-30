@@ -34,29 +34,44 @@ A green `opencode mcp list` result proves the **CLI** sees the server. It says
 can't see my tools," `opencode mcp list` is the wrong diagnostic — check the
 app's logs and UI instead.
 
-## MCP servers — import, don't hand-wire
+## MCP servers — use mcp-deploy, not the UI import
 
-### The intended path: import from another harness
+### The recommended path: mcp-deploy (canonical store)
 
-ZCode's Settings → MCP Servers panel has an **Import** button (top-right). It
-scans the MCP configs of other installed harnesses — **Codex CLI**
-(`~/.codex/config.toml`) and **opencode** (`~/.config/opencode/opencode.json`)
-— and lists their servers for one-click import into ZCode (User or Workspace
-scope).
+ZCode's MCP config is managed by `mcp-deploy` from the canonical store at
+`~/Me/repos/mcps/`. Add or edit a server in `servers.toml`, then:
 
-**This is the canonical way to add an MCP server to ZCode.** It mirrors how
-other harnesses (e.g. Craft Agents) work: get the server working in one harness
-first, then import.
+```bash
+cd ~/Me/repos/mcps
+./deploy/mcp-deploy deploy --harness zcode --dry-run   # preview
+./deploy/mcp-deploy deploy --harness zcode             # write (backs up)
+```
+
+**Use the `mcp-manage` skill for the full workflow.** It covers the wrapper
+pattern, secret handling, and all five harnesses. The canonical store is the
+single source of truth for ZCode's `~/.zcode/cli/config.json`.
+
+### Why the UI Import button produces broken configs
+
+ZCode's Settings → MCP Servers panel has an **Import** button that scans
+Codex/opencode configs. **In practice, imports arrive broken:**
+
+- opencode's merged command array (`["npx","-y",...]`) lands in ZCode, which
+  expects `command` as a single executable path. The server won't start.
+- `{env:VAR}` tokens resolve empty (ZCode's process env is empty unless
+  launched via op-env). Remote servers with `{env:}` auth fail silently.
+- Stray `enable` fields appear alongside `enabled` (format-transition artifacts).
+
+The fix is the same for all of these: convert to a **wrapper script** that
+resolves the secret from 1Password at spawn. `mcp-deploy` does this
+automatically when canonical declares a wrapper. For remote MCP servers, use
+the parameterised `~/.local/bin/mcp-remote-wrapper.sh`.
 
 The correct sequence for adding *any* new MCP server to ZCode:
 
-1. Get it working in **Codex** or **opencode** first (those use plain config
-   files you can edit and test directly).
-2. Verify it there with a real tool call that returns data from the target
-   system.
-3. Open ZCode → Settings → MCP Servers → Import → select the server → choose
-   scope (User for everywhere, Workspace for one project).
-4. Restart ZCode and verify in a fresh session.
+1. Add it to the canonical store (`servers.toml`) — see the `mcp-manage` skill.
+2. Deploy with `mcp-deploy deploy --harness zcode`.
+3. Restart ZCode and verify (see "Verifying" below).
 
 ### Why hand-editing config files fails for ZCode
 
