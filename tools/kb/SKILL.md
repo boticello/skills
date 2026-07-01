@@ -246,7 +246,7 @@ args = ["@bitbonsai/mcpvault@latest", "/Users/bear/Me/kb"]
 [servers.obsidian-hybrid-search]
 command = ".../obsidian-hybrid-search"
 args = ["mcp", "--db", "/Users/bear/Me/kb/.obsidian-hybrid-search.db"]
-env = { OBSIDIAN_VAULT_PATH = "/Users/bear/Me/kb", OPENAI_BASE_URL = "http://localhost:1234/v1", OPENAI_EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5" }
+env = { OBSIDIAN_VAULT_PATH = "/Users/bear/Me/kb", OPENAI_BASE_URL = "http://localhost:1234/v1", OPENAI_EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5", OBSIDIAN_IGNORE_PATTERNS = ".obsidian/**,templates/**,*.canvas,inbox/**,noteplan-calendar/**,noteplan-notes/**" }
 ```
 
 Embeddings use **LM Studio** (local, OpenAI-compatible API at
@@ -273,6 +273,22 @@ The DB at `.obsidian-hybrid-search.db` was created with `embedding_dim:
 768` to match the nomic model. If the embedding model changes, delete
 the DB and reindex (dimension mismatch errors mean the DB was created
 with a different model).
+
+### Ignore patterns
+
+The `OBSIDIAN_IGNORE_PATTERNS` env var controls which paths are excluded
+from indexing. It uses gitignore-style globs (comma-separated). The
+default is `.obsidian/**,templates/**,*.canvas` — our config adds
+`inbox/**`, `noteplan-calendar/**`, and `noteplan-notes/**` to exclude
+~14.4K imported files (Logseq journals, NotePlan, Confluence, Ulysses)
+that clutter search results.
+
+The env var **replaces** defaults entirely, so the originals must be
+repeated when extending. Patterns are persisted in the DB; after
+changing them, run `obsidian-hybrid-search reindex --force` to apply.
+
+To add or remove exclusions, edit `OBSIDIAN_IGNORE_PATTERNS` in
+`~/Me/repos/mcps/servers.toml` and redeploy.
 
 ### LM Studio management (`~/.lmstudio/bin/lms`)
 
