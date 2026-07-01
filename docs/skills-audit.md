@@ -222,15 +222,23 @@ mean doing it twice.
 
 ## Phases (dependency-ordered)
 
-| Phase | Name | Gates / depends on |
-|-------|------|--------------------|
-| **0** | **Unblocked mechanics** — delete duplicates, fix isolated defects | nothing |
-| **1** | **Note / filing successor** — confirm Obsidian interface direction | gates Phase 4 |
-| **2** | **Scoping pass (`skills-2gs`)** — move niche skills out of global default | nothing (mechanical once principle accepted) |
-| **3** | **Coding-agent architecture ticket** — bound as above; its own focused effort | nothing, but don't rush |
-| **4** | **Salvage rewrites** — orientate / system-self-care / change-manage + extract feature-build reflection cycle | blocked on Phase 1 |
-| **5** | **Trigger-quality pass (`skills-2lm`)** — descriptions + `triggers:` across the stable set | last; wasted effort while set churns |
+| Phase | Name | Gates / depends on | Status |
+|-------|------|--------------------|--------|
+| **0** | **Unblocked mechanics** — delete duplicates, fix isolated defects | nothing | ✅ done (`53bfa75`) |
+| **1** | **Note / filing successor** — Obsidian tooling + interface contract + stub skill | gates Phase 4 | brief: [`docs/phase1-brief.md`](phase1-brief.md); ticket `skills-skills-phase1-2s7` |
+| **2** | **Scoping pass (`skills-2gs`)** — move niche skills out of global default | nothing (mechanical once principle accepted) | brief: [`docs/phase2-brief.md`](phase2-brief.md); ticket `skills-2gs` |
+| **3** | **Coding-agent architecture ticket** — bound as above; its own focused effort | nothing, but don't rush | ticket `skills-skills-coding-arch-kva`; brief not yet written |
+| **4** | **Salvage rewrites** — orientate / system-self-care / change-manage + extract feature-build reflection cycle | blocked on Phase 1 | — |
+| **5** | **Trigger-quality pass (`skills-2lm`)** — descriptions + `triggers:` across the stable set | last; wasted effort while set churns | — |
 
 Phase 5 is intentionally last: sharp triggering should be baked in at
 authoring time (as the best skills already show), not retrofitted onto a
 moving target.
+
+### Execution model
+
+The user supervises; executing agents tackle each phase from its brief and
+report back at checkpoints. Briefs are self-contained (read the brief, not
+the conversation) and live under `docs/`. Phase 1 and Phase 2 are
+independent and can run in parallel; Phase 3 is independent but higher-effort;
+Phase 4 waits on Phase 1; Phase 5 waits on all prior churn.
