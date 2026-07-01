@@ -210,6 +210,7 @@ only when the note is inherently domain-bound. Most notes live in
 |---|---|---|
 | `mcpvault` | MCP server | CRUD + search + frontmatter + tags on the vault. 14 tools. |
 | `obsidian-hybrid-search` | CLI + MCP | Semantic + fulltext + graph search. Used for drift-detection and backlinks. |
+| `~/.lmstudio/bin/lms` | CLI | LM Studio model management — load/unload models, check server status. |
 | `br` | CLI | Issue tracking. Ticketing operations go here, not through the vault. |
 
 ### MCP servers (canonical config: `~/Me/repos/mcps/servers.toml`)
@@ -258,6 +259,19 @@ The DB at `.obsidian-hybrid-search.db` was created with `embedding_dim:
 768` to match the nomic model. If the embedding model changes, delete
 the DB and reindex (dimension mismatch errors mean the DB was created
 with a different model).
+
+### LM Studio management (`~/.lmstudio/bin/lms`)
+
+The embedding model must be loaded in LM Studio before indexing or
+search. Use `lms` to manage this without the GUI:
+
+```bash
+~/.lmstudio/bin/lms ps              # what's loaded in memory
+~/.lmstudio/bin/lms ls              # what's available on disk
+~/.lmstudio/bin/lms load text-embedding-nomic-embed-text-v1.5
+~/.lmstudio/bin/lms unload text-embedding-nomic-embed-text-v1.5
+~/.lmstudio/bin/lms server status   # is the API server running?
+```
 
 ## References
 
