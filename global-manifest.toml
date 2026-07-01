@@ -9,7 +9,7 @@
 # NOTE: adding a new skill to canonical requires adding it here too, or it
 # won't deploy globally. Run reconcile/deploy --dry-run to catch drift.
 
-# 39 skills (role-universal core)
+# 35 skills (role-universal core)
 skills = [
     "agent-commit-workflow",
     "agent-implementation-strategy",
@@ -22,8 +22,6 @@ skills = [
     "cheatsheets",
     "code-and-docs-search",
     "code-review",
-    "concept-boundary-test",
-    "concept-layer-synthesis",
     "discovery-architect",
     "documentation-writer",
     "feature-handoff",
@@ -42,8 +40,6 @@ skills = [
     "skills-manage",
     "spike-planning",
     "supervisor",
-    "tool-eval",
-    "typst",
     "update-docs",
     "verify",
     "work-unit-manage",
