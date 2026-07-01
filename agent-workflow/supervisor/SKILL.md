@@ -1,6 +1,6 @@
 ---
 name: supervisor
-description: Use when Codex must supervise a long-running or multi-phase engineering effort across planning, delegation, subagents, recon, implementation, integration, verification, reports, repo/workspace state, or phase handoff. Trigger when the user asks Codex to act as supervisor, orchestrator, lead engineer, coordinator, phase owner, or to manage, delegate, review, integrate, or continue work over multiple tasks or agents.
+description: Use when a phase of work is already scoped and needs execution management — delegation, subagent coordination, verification, integration, reporting, and phase handoff. Trigger when the user asks to supervise, manage a phase, delegate work, coordinate executors, or run a bounded engineering effort with clear ownership.
 ---
 
 # Supervisor
