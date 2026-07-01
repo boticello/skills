@@ -101,16 +101,45 @@ auth = "__clear"
 `__clear` removes a field the canonical server declares but the override
 shouldn't carry.
 
-### 3. Deploy + verify
+### 3. Deploy + verify (ALL THREE STEPS — skipping any is the #1 mistake)
 
 ```bash
 cd ~/Me/repos/mcps
-./deploy/mcp-deploy list                           # confirm the server appears
-./deploy/mcp-deploy deploy --harness <name> --dry-run   # preview, no write
-./deploy/mcp-deploy deploy --harness <name>        # write (backs up first)
+./deploy/mcp-deploy list                                # confirm the server appears
+./deploy/mcp-deploy deploy --harness <name> --dry-run   # 1. preview (no write)
+./deploy/mcp-deploy deploy --harness <name>             # 2. WRITE to live (backs up)
+./deploy/mcp-deploy deploy --harness <name> --dry-run   # 3. confirm no-op (idempotent)
 ```
 
-Re-running deploy with no canonical change is a no-op. Every write backs up
+**A clean dry-run is NOT verification.** It only proves the render is correct.
+It does NOT mean the live config changed, and it does NOT mean the running app
+sees the change. The three failure modes this catches:
+
+1. **You dry-ran but never deployed.** The live config is unchanged. Always run
+   the real `deploy` (step 2), then confirm with `--dry-run` again (step 3)
+   which should report `unchanged`.
+2. **The config is correct but the app hasn't reloaded it.** Desktop apps
+   (ZCode, Zed) hold config in memory until restarted. After deploying to
+   ZCode/Zed, **restart the app** and check its logs:
+   - ZCode: `grep mcpServerNames ~/.zcode/v2/logs/$(date +%Y-%m-%d).log | tail -1`
+     — your server must be in that list.
+   - Zed: check Settings → Context Servers for green status.
+3. **The server connects but tools don't surface.** ZCode does auto-tool-
+   selection by context. Trigger the relevant skill or domain phrasing to
+   surface tools. A connected server ≠ tools available to the agent.
+
+**The strongest verification is a real tool call returning data** — not a
+successful `initialize` handshake, not a green status light. Probe over stdio
+independent of the app to confirm the wrapper resolves secrets and reaches the
+server:
+
+```bash
+{ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0.1"}}}'; sleep 5;
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'; sleep 5;
+  printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'; sleep 8; } | <wrapper-command>
+```
+
+Re-running `deploy` with no canonical change is a no-op. Every write backs up
 to `~/.local/state/mcp-backups/<timestamp>/`.
 
 ### 4. Commit the canonical change
@@ -131,6 +160,33 @@ imports get disabled by hand as a workaround.
 programmatically: wrapper scripts instead of `{env:VAR}` remotes, clean field
 shapes, no import artifacts. **This is not fighting ZCode's workflow — it's
 the fix for a workflow that produces broken results.**
+
+### The verified pattern for ZCode remote servers
+
+Remote MCP servers (zread, web-reader, web-search-prime, context7) that work
+fine as native `{type: "remote", url: ...}` in opencode/Codex **break in
+ZCode** because ZCode's process env doesn't carry the `{env:VAR}` keys (unless
+launched via op-env). The symptom: the server returns a non-JSON-RPC error
+envelope (`{"code","msg","success"}`) and ZCode logs union-validation errors.
+
+The fix (verified working in a live ZCode session): convert each to a **local
+wrapper** using the parameterised `~/.local/bin/mcp-remote-wrapper.sh`, which
+resolves the key from 1Password at spawn and proxies via `mcp-remote`:
+
+```toml
+[servers.my-remote.overrides.zcode]
+intent = "local"
+command = "/Users/bear/.local/bin/mcp-remote-wrapper.sh"
+args = ["https://the-remote-url/mcp", "op://AI-Keys/the-item/credential"]
+url = "__clear"
+auth = "__clear"
+startup = "__clear"
+enabled = true
+```
+
+ZCode does support `command` + `args` (confirmed in its docs and verified by
+tool calls returning data), so the parameterised form works — no need for
+per-server wrapper scripts.
 
 ## Secret handling (the rules)
 
