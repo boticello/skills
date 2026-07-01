@@ -33,12 +33,12 @@ triggers:
 
 # kb — Obsidian Knowledge Base Interface
 
-> **Status: stub — contract declared, wiring pending.**
+> **Status: tooling wired, contract declared, vault schema in progress.**
 > The schemas and operations below are the target interface. The vault
 > organisation at ~/Me/kb is in progress (see br issues `kb-schema-v34`
-> and friends). Tooling is installed (`mcpvault` MCP server,
-> `obsidian-hybrid-search` CLI). The salvage skills (Phase 4) will
-> target this contract.
+> and friends). Tooling is installed and wired (`mcpvault` MCP server,
+> `obsidian-hybrid-search` CLI + MCP via LM Studio embeddings). The
+> salvage skills (Phase 4) will target this contract.
 
 ## What this skill is NOT
 
@@ -212,29 +212,52 @@ only when the note is inherently domain-bound. Most notes live in
 | `obsidian-hybrid-search` | CLI + MCP | Semantic + fulltext + graph search. Used for drift-detection and backlinks. |
 | `br` | CLI | Issue tracking. Ticketing operations go here, not through the vault. |
 
-### MCP server configuration
+### MCP servers (canonical config: `~/Me/repos/mcps/servers.toml`)
 
-```json
-{
-  "mcpServers": {
-    "obsidian": {
-      "command": "npx",
-      "args": ["@bitbonsai/mcpvault@latest", "/Users/bear/Me/kb"]
-    }
-  }
-}
+Two MCP servers back this skill. Both are local, no secrets, no wrapper.
+Deploy to all harnesses via `mcp-deploy deploy --harness <name>`.
+
+**mcpvault** — vault CRUD + search (14 tools):
+
+```toml
+[servers.mcpvault]
+command = "npx"
+args = ["@bitbonsai/mcpvault@latest", "/Users/bear/Me/kb"]
 ```
 
-### Hybrid search setup
+**obsidian-hybrid-search** — semantic + fulltext + graph search:
+
+```toml
+[servers.obsidian-hybrid-search]
+command = ".../obsidian-hybrid-search"
+args = ["mcp", "--db", "/Users/bear/Me/kb/.obsidian-hybrid-search.db"]
+env = { OBSIDIAN_VAULT_PATH = "/Users/bear/Me/kb", OPENAI_BASE_URL = "http://localhost:1234/v1", OPENAI_EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5" }
+```
+
+Embeddings use **LM Studio** (local, OpenAI-compatible API at
+`localhost:1234`). The model `text-embedding-nomic-embed-text-v1.5` must
+be loaded in LM Studio for indexing and search to work.
+
+### Hybrid search CLI usage
 
 ```bash
-# Index the vault (first time)
-obsidian-hybrid-search reindex /Users/bear/Me/kb
+# Index files (scoped — don't index the whole vault at once)
+cd ~/Me/kb
+obsidian-hybrid-search reindex "path/to/note.md"
 
 # Search
-obsidian-hybrid-search search "query" --mode hybrid
-obsidian-hybrid-search search --path "04-notes/note/some-note.md" --related
+obsidian-hybrid-search search "query"                          # hybrid (default)
+obsidian-hybrid-search search "query" --mode semantic          # semantic only
+obsidian-hybrid-search search --path "note.md" --related       # backlinks
+
+# Status
+obsidian-hybrid-search status
 ```
+
+The DB at `.obsidian-hybrid-search.db` was created with `embedding_dim:
+768` to match the nomic model. If the embedding model changes, delete
+the DB and reindex (dimension mismatch errors mean the DB was created
+with a different model).
 
 ## References
 
