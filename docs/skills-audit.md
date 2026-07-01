@@ -227,7 +227,7 @@ mean doing it twice.
 | **0** | **Unblocked mechanics** — delete duplicates, fix isolated defects | nothing | ✅ done (`53bfa75`) |
 | **1** | **Note / filing successor** — Obsidian tooling + interface contract + stub skill | gates Phase 4 | brief: [`docs/phase1-brief.md`](phase1-brief.md); ticket `skills-skills-phase1-2s7` |
 | **2** | **Scoping pass (`skills-2gs`)** — move niche skills out of global default | nothing (mechanical once principle accepted) | brief: [`docs/phase2-brief.md`](phase2-brief.md); ticket `skills-2gs` |
-| **3** | **Coding-agent architecture ticket** — bound as above; its own focused effort | nothing, but don't rush | ticket `skills-skills-coding-arch-kva`; brief not yet written |
+| **3** | **Knowledge-work orchestration + coding-agent architecture** | nothing, but don't rush | brief: [`docs/phase3-brief.md`](phase3-brief.md); ticket `skills-skills-coding-arch-kva` |
 | **4** | **Salvage rewrites** — orientate / system-self-care / change-manage + extract feature-build reflection cycle | blocked on Phase 1 | — |
 | **5** | **Trigger-quality pass (`skills-2lm`)** — descriptions + `triggers:` across the stable set | last; wasted effort while set churns | — |
 
