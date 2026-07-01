@@ -23,7 +23,7 @@ metadata:
   version: 1.0.0
 ---
 
-<!-- TOC: Critical Rules | Quick Workflow | Essential Commands | Dependencies | Sync | bv Integration | Agent Mail | Troubleshooting | References -->
+<!-- TOC: Critical Rules | Quick Workflow | Essential Commands | Cross-tracker routing | Dependencies | Sync | bv Integration | Agent Mail | Troubleshooting | References -->
 
 # br -- Beads Rust Issue Tracker (Official Skill)
 
@@ -152,6 +152,51 @@ br count --by status --json | jq '.[]'
 
 Run the command once with `--json` and pipe to `jq 'keys'` or `jq . | head`
 if you need to discover a shape you haven't seen — don't guess it.
+
+### Cross-tracker routing
+
+`br` is **distributed**: each meaningful working area has its own `.beads/`
+tracker with its own prefix. There is no global registry. An issue's ID
+prefix tells you *which* tracker owns it — but not where that tracker lives
+on disk.
+
+| Prefix | Tracker home (convention, not law) |
+|---|---|
+| `skills-*` | `~/Me/repos/skills` (the repo you're likely in) |
+| `kb-*` | `~/Me/kb` (the Obsidian vault) |
+| `dotfiles-*` | `~/Me/OS/dotfiles` |
+| `system-*` | `~/Me/workspace/system` (workspace-/coordination-level concerns) |
+| `mcps-*` | `~/Me/repos/mcps` |
+| others | per-area — records, scratch, other repos |
+
+**When work spans trackers** — which is normal, not edge-case — decide
+ownership by *subject*: an issue lives with the code/area it tracks. A
+Zenflow-coordination evaluation is a workspace concern → `system-*`, even
+if discovered while working in the skills repo. Don't shoehorn
+cross-cutting work into the local tracker with a foreign prefix.
+
+**To address an issue outside the local tracker**, use `--db`:
+
+```bash
+# from anywhere — read/write a foreign tracker explicitly
+br show system-zenflow-eval-05k --db ~/Me/workspace/system/.beads/beads.db
+br comments add --actor "$ACTOR" system-zenflow-eval-05k \
+  --db ~/Me/workspace/system/.beads/beads.db --message "..."
+
+# or cd into the tracker's repo and let auto-discover find it
+cd ~/Me/workspace/system && br show system-zenflow-eval-05k
+```
+
+**Don't `br show <foreign-id>` from the local tracker without `--db`** — it
+will look in the wrong DB and report "not found" (or worse, a collision).
+The prefix is your routing key, but the path is your responsibility.
+
+**When you don't know where a prefix lives**, enumerate the trackers:
+
+```bash
+find ~/Me -maxdepth 4 -name .beads -type d 2>/dev/null
+# then br where --db <candidate>/beads.db | grep prefix
+```
 
 ### Dependencies
 
