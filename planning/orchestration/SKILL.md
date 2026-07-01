@@ -7,12 +7,18 @@ description: >
   oracle handling, and capture decisions.
 metadata:
   short-description: WIP orchestrator protocol
-  status: tbc
+  status: archived
   maturity: skeleton
   related-tickets:
     - 300
     - 596
     - 601
+  note: >
+    Archived. Superseded by lead (entry posture), supervisor (manage-down
+    posture), coordination-protocol (transitions and rules), and
+    execution-spine (executor operating manual). Dead document-management
+    dependency never materialized. Retained in repo for reference; not
+    deployed globally.
 ---
 
 # Orchestration

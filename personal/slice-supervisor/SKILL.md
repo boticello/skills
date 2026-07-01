@@ -2,6 +2,14 @@
 name: "Slice Supervisor"
 description: "Coordinate multi-role agent work across discovery, planning, implementation, and review. Enforce document boundaries, check entry criteria, assemble context bundles, and approve transitions."
 alwaysAllow: ["Bash"]
+metadata:
+  disposition: library
+  note: >
+    Coding-specific, multi-agent orchestration for the go-slice experiment.
+    Not in global-manifest.toml — available via project add only. Preserved
+    as a unit with go-slice-planner, go-slice-implementer, go-slice-reviewer,
+    and slice-retro. The general orchestration model is now in
+    coordination-protocol + execution-spine + supervisor.
 ---
 
 # Slice Supervisor
