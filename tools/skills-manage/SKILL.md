@@ -6,7 +6,9 @@ description: >-
   to know where skills live or why not to edit them in place; or when questions
   arise about the deploy script, manifests, scoping (global vs project), or
   vendor provenance. Load before scaffolding a new skill or touching any
-  ~/.agents/skills or ~/.codex/skills directory.
+  ~/.agents/skills or ~/.codex/skills directory. ALSO load alongside the
+  skill-creator plugin skill — it overrides skill-creator's "where skills live"
+  guidance for this machine's canonical-store model.
 ---
 
 # skills-manage
@@ -26,6 +28,33 @@ are generated targets that get overwritten on the next deploy.**
 If you find yourself wanting to create a skill in a target directory, stop.
 Create it in the canonical store instead, then deploy. If a skill already
 exists in a target but not canonically, that's drift — gather it (see below).
+
+## Conflict with the `skill-creator` plugin skill
+
+The vendored `skill-creator` plugin skill (from `zcode-plugins-official`)
+advises creating skills directly in `~/.agents/skills/` — the discovery
+directory. **On this machine, that is wrong.** It is written for the generic
+ZCode case where no canonical store exists and overwrites will never happen.
+Here, the canonical store does exist and overwrites *will* happen on the next
+`skills-deploy`.
+
+**When both skills are loaded, this skill's model wins on where skills live
+and how they deploy.** Use `skill-creator` for its authoring guidance (intent
+capture, drafting, test prompts, iteration) but ignore its "Where skills live"
+section. Specifically:
+
+- `skill-creator` says: *"Default to creating new skills under
+  `.agents/skills/`"* → **ignore this**. Create under
+  `~/Me/repos/skills/<category>/<name>/` instead.
+- `skill-creator` does not mention `global-manifest.toml` → **you must add
+  the new skill name to `~/Me/repos/skills/global-manifest.toml`** or it will
+  not deploy globally (skills-deploy skips unlisted skills).
+- `skill-creator`'s deploy step is absent → use `skills-deploy deploy`, not
+  file creation in a discovery dir.
+
+This is the load-bearing detail. A skill created correctly in canonical but
+missing from `global-manifest.toml` silently fails to deploy — no error, just
+absence. Always check the manifest.
 
 ## The model
 
@@ -83,15 +112,29 @@ why no per-harness manifests, why copies not symlinks), read
 3. Auxiliary files (scripts, references, templates) live alongside `SKILL.md`
    in the same folder — they deploy with the skill as whole-folder copies.
 
-4. Deploy:
+4. **Add the skill to `global-manifest.toml`** — this is mandatory. A skill
+   that exists in canonical but is missing from the manifest will NOT deploy
+   globally (skills-deploy silently skips it). This is the most common
+   creation-time mistake:
+
+   ```toml
+   # global-manifest.toml — add the name in alphabetical order
+   skills = [
+       # ...
+       "mcp-manage",    # <-- add here
+       # ...
+   ]
+   ```
+
+5. Deploy:
 
    ```bash
    cd ~/Me/repos/skills
-   ./deploy/skills-deploy deploy --dry-run   # preview
+   ./deploy/skills-deploy deploy --dry-run   # preview — confirm the new skill shows as "added"
    ./deploy/skills-deploy deploy             # copy to targets
    ```
 
-5. Commit in the canonical repo.
+6. Commit in the canonical repo (both the skill AND the manifest change).
 
 **Never edit targets directly.** They are mirrors of canonical. Any change
 made in `~/.agents/skills/` or `~/.codex/skills/` will be overwritten on the
@@ -196,6 +239,12 @@ listed there become available only via a project's `add`.
 
 - **Creating a skill in `~/.agents/skills/` or `~/.codex/skills/`.** It will be
   overwritten on next deploy. Create in canonical, then deploy.
+- **Forgetting to add the skill to `global-manifest.toml`.** The skill exists
+  in canonical but never deploys — silently. No error, just absence. Always
+  add the name to the manifest at creation time.
+- **Following `skill-creator`'s "Where skills live" guidance.** That plugin
+  skill is written for the generic case (no canonical store) and points at
+  `~/.agents/skills/`. See the "Conflict with skill-creator" section above.
 - **Editing a deployed skill in place.** Same — overwritten. Edit canonical.
 - **Using symlinks to share skills across targets.** Codex has a known bug
   where symlinked skill dirs silently fail to load. Deploy copies real dirs.
