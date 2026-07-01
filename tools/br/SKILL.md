@@ -34,7 +34,8 @@ metadata:
 | Rule | Why |
 |------|-----|
 | **Binary is `br`** | NEVER `bd` (that is the old Go version) |
-| **ALWAYS use `--json`** | Structured output for parsing; `--format toon` for reduced tokens |
+| **Prefer human output for inspection** | For "did this land?" / "what's the status?" — run the command and read it. Don't reach for `--json` + a parser for ad-hoc checks. |
+| **`--json` is for programmatic use** | Bulk triage, orchestrator scripts, feeding another tool. When you do use it, pipe through `jq` (see "JSON with jq" below) — not python. |
 | **NEVER run bare `bv`** | Blocks session in interactive TUI mode |
 | **Sync is EXPLICIT** | `br sync --flush-only` exports DB to JSONL only |
 | **Git is YOUR job** | br only touches `.beads/` -- you must `git add .beads/ && git commit` |
@@ -109,20 +110,48 @@ Bulk update (batch triage):
 br update --actor "$ACTOR" <id1> <id2> <id3> --priority 2 --add-label triage-reviewed --json
 ```
 
-### Querying (always use --json for agents)
+### Querying
+
+For inspection (status, did a comment land, what's open) run the command
+without `--json` and read the output. Use `--json` only when an agent or
+script needs to consume the result programmatically — and pipe through `jq`.
 
 ```bash
-br ready --json                      # Actionable work (no blockers)
-br list --json                       # All issues
-br list --status open --sort priority --json  # Filter and sort
-br list --priority 0-1 --json        # Filter by priority range
-br list --assignee alice --json      # Filter by assignee
-br blocked --json                    # Show blocked issues
-br search "keyword" --json           # Full-text search
-br show <id> --json                  # Issue details with dependencies
-br stale --days 30 --json            # Stale issues
-br count --by status --json          # Count with grouping
+br ready                            # Actionable work (no blockers)
+br list                             # All issues
+br list --status open --sort priority
+br list --priority 0-1
+br blocked                          # Show blocked issues
+br search "keyword"                 # Full-text search
+br show <id>                        # Issue details with dependencies
+br stale --days 30
+br count --by status                # Count with grouping
+br comments list <id>               # Read comments on an issue
 ```
+
+### JSON with jq
+
+When you do need machine-readable output, use `jq` — not python. Common
+shapes:
+
+```bash
+# list / ready / blocked return: { issues, total, limit, offset, has_more }
+br list --status open --json | jq '.issues[].id'
+br ready --json | jq '.issues | length'
+
+# show returns an array (one element per id); comments nested under .comments
+br show <id> --json | jq '.[0].status, .[0].labels'
+
+# comments list returns: [ {id, issue_id, author, text, created_at} ]
+br comments list <id> --json | jq '.[].author'
+br comments list <id> --json | jq 'length'
+
+# count returns grouped totals
+br count --by status --json | jq '.[]'
+```
+
+Run the command once with `--json` and pipe to `jq 'keys'` or `jq . | head`
+if you need to discover a shape you haven't seen — don't guess it.
 
 ### Dependencies
 

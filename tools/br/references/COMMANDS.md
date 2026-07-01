@@ -4,7 +4,7 @@
 
 | Flag | Description |
 |------|-------------|
-| `--json` | JSON output (machine-readable) -- **ALWAYS use for agents** |
+| `--json` | JSON output (machine-readable). Use for programmatic consumption (bulk triage, scripts); pipe through `jq`. For ad-hoc inspection (status, did-X-land) prefer the human-readable default. |
 | `--format toon` | Token-optimized output (reduced context usage) |
 | `--quiet` / `-q` | Suppress output |
 | `--verbose` / `-v` | Increase verbosity (-vv for debug) |
