@@ -2,6 +2,9 @@
 name: agent-vcs-workflow-with-jj
 description: (no description)
 disable-model-invocation: true
+metadata:
+  status: deprecated
+  superseded-by: "jj-vcs (agent functions), jj-change-manage (workflow patterns), execution-spine (process)"
 ---
 
 # Jujutsu (jj) Integration for Agent-Assisted Coding

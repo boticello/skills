@@ -2,6 +2,9 @@
 name: agent-implementation-strategy
 description: (no description)
 disable-model-invocation: true
+metadata:
+  status: deprecated
+  superseded-by: execution-spine
 ---
 
 # Agent Implementation Strategy

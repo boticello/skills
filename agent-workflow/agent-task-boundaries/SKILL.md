@@ -2,6 +2,9 @@
 name: agent-task-boundaries
 description: (no description)
 disable-model-invocation: true
+metadata:
+  status: deprecated
+  superseded-by: execution-spine
 ---
 
 # Agent Task Boundaries Guidelines

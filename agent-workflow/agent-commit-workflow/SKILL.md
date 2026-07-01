@@ -2,6 +2,9 @@
 name: agent-commit-workflow
 description: (no description)
 disable-model-invocation: true
+metadata:
+  status: deprecated
+  superseded-by: "execution-spine (process), jj-vcs (jj tooling)"
 ---
 
 # Agent Commit Workflow
