@@ -154,6 +154,19 @@ br comments add --actor "$ACTOR" <id> --message "Triage note" --json
 br comments list <id> --json
 ```
 
+For substantial text (reports, briefs, reviews), use `--file <path>` rather
+than inlining — shell-quoting multi-line markdown with backticks, flags, or
+quotes is a transport risk.
+
+**Where reports belong.** A report that describes work done *on this ticket*
+(the work log, the outcome, what was delivered) belongs **as a comment on
+the ticket**, not as a free-standing file. The ticket is the durable record;
+its comment thread is the narrative. A report detached from its ticket is
+orphaned context. Reserve standalone docs (`log/`, `docs/`) for reports
+*about* the work that span multiple tickets or feed future decisions (e.g. a
+supervisor post-mortem, an architecture finding) — and even then, link the
+doc from the relevant ticket comment.
+
 ### Sync (EXPLICIT -- never automatic)
 
 ```bash
