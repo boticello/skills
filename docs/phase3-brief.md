@@ -202,16 +202,23 @@ or fold `verify`. Confirm `discovery-architect`, `write-design-doc`,
 `retro` as the spine stages. Spin off or library the slice-supervisor +
 go-slice unit.
 
-## Out of scope
+## Out of scope (for this phase)
 
 - Vault organisation (kb tracker, `kb-schema-v34` and friends).
 - Salvage rewrites of me-CLI skills (Phase 4, blocked on Phase 1).
 - Trigger-quality pass (Phase 5, last).
-- Implementation as a Burr/Theodisia state machine or Zenflow multi-agent
-  scaffolding. The protocols are captured as skills + artifact references
-  first; reach for external machinery only if the lightweight version
-  proves insufficient. The "models improving" trend cuts against rigid
-  machinery.
+- **Multi-agent coordination infrastructure** (Zenflow, Burr/Theodisia, or
+  equivalent). The human-as-queue failure mode observed during Phase 3
+  (reviewer and executor both idle, human relaying messages) is real
+  evidence that the lightweight convention-only model is insufficient for
+  *coordination* once more than one agent is live. However, this phase's
+  job is to codify the postures/artifacts/rules as skills first; the
+  Zenflow evaluation runs as its own exploratory ticket afterward, against
+  the cleaned-up skills, inside `workspace/system/`. Jumping to machinery
+  now would mean implementing against assumptions; letting Phase 3 finish
+  means the evaluation knows exactly which coordination primitives to test
+  (pub/sub wakeup, queue management, lead-triggers-workflow, subagent
+  handoff).
 
 ## Open questions (flag, don't block)
 
