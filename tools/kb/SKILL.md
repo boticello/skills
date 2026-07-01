@@ -110,6 +110,15 @@ This replaces `me jot list` and `jurn` queries.
 Queryable table over filing decisions. Each entry is a markdown file in
 `04-notes/log/` with `kind: filing` and these additional fields:
 
+> **Disambiguation from the general log Base.** Both Bases query
+> `04-notes/log/`, and both key on `kind`. They are kept disjoint by the
+> **additional required fields** a filing entry carries (`source_path`,
+> `destination_path`, `rule`, `rationale`) — a writer creating a filing
+> entry must populate all four; a general log entry must not. The filing
+> Base filters on these fields; the general log Base excludes `kind: filing`.
+> Do not rely on `kind` alone to tell them apart — rely on the presence of
+> the filing fields.
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `date` | date | yes | ISO 8601 |
@@ -158,8 +167,13 @@ body and populate frontmatter fields directly.
 | List by kind | mcpvault `list_directory` on `04-notes/{kind}/` | Or query the general log Base. |
 | List by date | mcpvault `list_directory` on `04-notes/log/` | Sorted by filename (ISO date prefix). |
 | Show one note | mcpvault `read_note` | Returns content + frontmatter. |
+| Read several notes | mcpvault `read_multiple_notes` | Batch full reads — cheaper than N × `read_note`. |
+| Note metadata only | mcpvault `get_notes_info` | Frontmatter + size + dates; no body. Cheap for orientation scans. |
+| Frontmatter only | mcpvault `get_frontmatter` | Single note's frontmatter. Cheapest read. |
 | Backlinks | obsidian-hybrid-search `--related --direction backlinks` | Who links to this note? |
 | Query filing history | mcpvault `search_notes` on `04-notes/log/` with frontmatter filter | Or use the filing Base. |
+| **Orientation — vault overview** | mcpvault `get_vault_stats` | Counts, recent activity, totals — for drift-detection and "what's changed" passes (the orientate/system-self-care use case). |
+| **Orientation — all tags** | mcpvault `list_all_tags` | Tag inventory across the vault — surface clusters, find underused tags. |
 
 ### Structure — link / tag / move
 
