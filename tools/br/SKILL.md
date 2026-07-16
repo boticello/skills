@@ -19,10 +19,10 @@ triggers:
   - br close
 metadata:
   author: Dicklesworthstone
-  version: 2.1.0
+  version: 2.2.0
 ---
 
-<!-- TOC: Scope | Workflow | Operating Rules | Related -->
+<!-- TOC: Scope | What this skill does not own | Operating Rules | Related -->
 
 # br -- Beads Rust Issue Tracker
 
@@ -32,20 +32,21 @@ shapes, and the full gotcha list live in the `br` cheatsheet.
 
 ## Scope
 
-`br` tracks issue lifecycles, priorities, dependencies, and ready/blocked state
-across one or more `.beads/` trackers: find actionable work, claim and close
-issues, manage the dependency graph that gates `br ready`.
+`br` is an adapter for the beads_rust tool: issue records, priorities,
+dependencies, ready/blocked state, and the storage/sync model across one or
+more `.beads/` trackers. It owns how to operate the tool safely — commands,
+flags, JSON shapes, cross-tracker routing, the gotchas that make a command
+fail silently or hit the wrong database.
 
-Triage method, commit workflow, and cross-agent coordination belong to the
-execution, VCS, and coordination skills.
+## What this skill does not own
 
-## Workflow
-
-The load-bearing command order (full syntax in the cheatsheet):
-
-1. `br ready` — find unblocked work; `br show <id>` to read the contract.
-2. `br update --claim` — claim and move to `in_progress`.
-3. `br close --reason` — close with evidence (commit SHA, file, or behaviour).
+`br` does not own the operational lifecycle. When work is ready, who claims it,
+the execution/verification/review sequence, when closure is permitted, and how
+phase transitions or handoffs happen are tracker-independent policy. They
+belong to the coordination protocol and posture skills (`coordination-protocol`,
+`supervisor`, `execution-spine`). The same lifecycle must work if the tracker
+underneath changes. `br` supplies the verbs (`ready`, `update --claim`,
+`close --reason`); it does not prescribe the order or the gates between them.
 
 ## Operating Rules
 
@@ -64,9 +65,11 @@ The gotchas that cause a wrong action if not internalized up front:
   `system-*`). A foreign-prefix ID needs `--db <path>` or a `cd` into the
   owning repo — bare `br show <foreign-id>` queries the wrong DB and reports
   "not found" or a collision.
-- **Close reasons are the durable record.** `--reason` holds the outcome and
-  evidence — never close without it. If the work is not verifiably done, leave
-  a comment instead of closing.
+- **`--reason` is the durable record.** Whatever you close, `--reason` holds the
+  outcome and evidence. Whether closure is the right move at a given point —
+  whether the work is verified, reviewed, or ready to be closed — is a
+  lifecycle decision, not a `br` rule; see `coordination-protocol`. If you are
+  not closing, record progress as a comment instead.
 - **Never run bare `bv`.** It launches an interactive TUI that blocks the
   session. Always use `--robot-*` flags (`--robot-next`, `--robot-triage`).
 - **No cycles.** `br dep cycles` must return empty — circular dependencies
@@ -76,5 +79,7 @@ The gotchas that cause a wrong action if not internalized up front:
 
 - `br` cheatsheet — command shapes, flags, JSON-shape `jq` recipes, full gotcha
   list, storage layout.
+- `coordination-protocol` — owns the lifecycle this skill defers: readiness,
+  claim, execution/review sequence, phase transition, and closure policy.
 - `git-vcs` / `git-change-manage` — commit and session-end workflow.
-- `execution-spine` / `supervisor` — triage method and phase management.
+- `execution-spine` / `supervisor` — posture skills that consume the lifecycle.
