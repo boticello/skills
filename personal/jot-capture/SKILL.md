@@ -79,6 +79,10 @@ me jot -k decision --project P0121 "Use entity-activity naming for the canonical
 me jot list -k reflection
 ```
 
+## Conceptual model
+
+The full conceptual model — kind vs role distinction, generic container principle, pattern guidance (plan, release-note, FAQ), and linking rationale — is in [`references/jot-model.md`](references/jot-model.md). Read it when making decisions about jot kinds, creating new kinds, or explaining the jot system to a new session.
+
 ## Output pattern
 
 When acting, report:
