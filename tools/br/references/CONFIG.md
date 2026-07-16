@@ -33,7 +33,7 @@ output:
 # Sync behavior
 sync:
   auto_import: false
-  auto_flush: false
+  auto_flush: true   # default — writes export JSONL immediately. Set false only for batch ops + explicit `br sync --flush-only`.
   branch: beads-sync  # Use dedicated sync branch
 ```
 

@@ -1,9 +1,11 @@
 ---
 name: br
 description: >-
-  Official skill for beads_rust (`br`), a local-first, dependency-aware issue
-  tracker for AI agents. Use when creating issues, triaging backlogs, managing
-  dependencies, finding ready work, updating status, or syncing to git via JSONL.
+  Use when creating issues, triaging backlogs, managing dependencies, or
+  finding ready work with `br` (beads_rust). Defines the minimal operating
+  rules an agent needs mid-task: the auto-export sync model, cross-tracker
+  routing, and the commands that fail silently. For command shapes, flags,
+  and JSON shapes, use the `br` cheatsheet.
 license: MIT
 domain: project-management
 role: specialist
@@ -20,436 +22,68 @@ triggers:
   - ready work
 metadata:
   author: Dicklesworthstone
-  version: 1.0.0
+  version: 2.0.0
 ---
 
-<!-- TOC: Critical Rules | Quick Workflow | Essential Commands | Cross-tracker routing | Dependencies | Sync | bv Integration | Agent Mail | Troubleshooting | References -->
-
-# br -- Beads Rust Issue Tracker (Official Skill)
-
-> **Non-invasive:** br NEVER runs git commands. Sync and commit are YOUR responsibility.
-
-## Critical Rules for Agents
-
-| Rule | Why |
-|------|-----|
-| **Binary is `br`** | NEVER `bd` (that is the old Go version) |
-| **Prefer human output for inspection** | For "did this land?" / "what's the status?" — run the command and read it. Don't reach for `--json` + a parser for ad-hoc checks. |
-| **`--json` is for programmatic use** | Bulk triage, orchestrator scripts, feeding another tool. When you do use it, pipe through `jq` (see "JSON with jq" below) — not python. |
-| **NEVER run bare `bv`** | Blocks session in interactive TUI mode |
-| **Sync is EXPLICIT** | `br sync --flush-only` exports DB to JSONL only |
-| **Git is YOUR job** | br only touches `.beads/` -- you must `git add .beads/ && git commit` |
-| **No cycles allowed** | `br dep cycles` must return empty |
-| **Resolve actor at runtime** | Use `ACTOR="${BR_ACTOR:-assistant}"` and pass `--actor "$ACTOR"` |
-
-## Quick Workflow
-
-```bash
-ACTOR="${BR_ACTOR:-assistant}"
-
-# 1. Find work
-br ready --json
-
-# 2. Claim it
-br update --actor "$ACTOR" <id> --status in_progress
-
-# 3. Do work...
-
-# 4. Complete
-br close --actor "$ACTOR" <id> --reason "Implemented X"
-
-# 5. Sync to git (EXPLICIT!)
-br sync --flush-only
-git add .beads/ && git commit -m "feat: X (<id>)"
-```
-
-## Essential Commands
-
-### Issue Lifecycle
-
-```bash
-ACTOR="${BR_ACTOR:-assistant}"
-
-br init                                              # Initialize .beads/ workspace
-br create --actor "$ACTOR" "Title" -p 1 -t task      # Create issue (priority 0-4)
-br q --actor "$ACTOR" "Quick note"                   # Quick capture (ID only output)
-br show <id> --json                                  # Show issue details
-br update --actor "$ACTOR" <id> --status in_progress # Update status
-br update --actor "$ACTOR" <id> --priority 0         # Change priority
-br close --actor "$ACTOR" <id> --reason "Done"       # Close with reason
-br close --actor "$ACTOR" <id1> <id2> --reason "..."  # Close multiple at once
-br reopen --actor "$ACTOR" <id>                      # Reopen closed issue
-```
-
-### Create Options
-
-```bash
-br create --actor "$ACTOR" "Title" \
-  --priority 1 \             # 0-4 scale (0=critical, 4=backlog)
-  --type task \              # task, bug, feature, epic, question, docs
-  --assignee "user@..." \    # Optional assignee
-  --labels backend,auth \    # Comma-separated labels
-  --description "..."        # Detailed description
-```
-
-### Update Options
-
-```bash
-br update --actor "$ACTOR" <id> \
-  --title "New title" \
-  --priority 0 \
-  --status in_progress \     # open, in_progress, closed
-  --assignee "new@..." \
-  --add-label reliability \
-  --parent <parent-id> \
-  --claim                    # Shorthand for claim-and-start
-```
-
-Bulk update (batch triage):
-```bash
-br update --actor "$ACTOR" <id1> <id2> <id3> --priority 2 --add-label triage-reviewed --json
-```
-
-### Querying
-
-For inspection (status, did a comment land, what's open) run the command
-without `--json` and read the output. Use `--json` only when an agent or
-script needs to consume the result programmatically — and pipe through `jq`.
-
-```bash
-br ready                            # Actionable work (no blockers)
-br list                             # All issues
-br list --status open --sort priority
-br list --priority 0-1
-br blocked                          # Show blocked issues
-br search "keyword"                 # Full-text search
-br show <id>                        # Issue details with dependencies
-br stale --days 30
-br count --by status                # Count with grouping
-br comments list <id>               # Read comments on an issue
-```
-
-### JSON with jq
-
-When you do need machine-readable output, use `jq` — not python. Common
-shapes:
-
-```bash
-# list / ready / blocked return: { issues, total, limit, offset, has_more }
-br list --status open --json | jq '.issues[].id'
-br ready --json | jq '.issues | length'
-
-# show returns an array (one element per id); comments nested under .comments
-br show <id> --json | jq '.[0].status, .[0].labels'
-
-# comments list returns: [ {id, issue_id, author, text, created_at} ]
-br comments list <id> --json | jq '.[].author'
-br comments list <id> --json | jq 'length'
-
-# count returns grouped totals
-br count --by status --json | jq '.[]'
-```
-
-Run the command once with `--json` and pipe to `jq 'keys'` or `jq . | head`
-if you need to discover a shape you haven't seen — don't guess it.
-
-### Cross-tracker routing
-
-`br` is **distributed**: each meaningful working area has its own `.beads/`
-tracker with its own prefix. There is no global registry. An issue's ID
-prefix tells you *which* tracker owns it — but not where that tracker lives
-on disk.
-
-| Prefix | Tracker home (convention, not law) |
-|---|---|
-| `skills-*` | `~/Me/repos/skills` (the repo you're likely in) |
-| `kb-*` | `~/Me/kb` (the Obsidian vault) |
-| `dotfiles-*` | `~/Me/OS/dotfiles` |
-| `system-*` | `~/Me/workspace/system` (workspace-/coordination-level concerns) |
-| `mcps-*` | `~/Me/repos/mcps` |
-| others | per-area — records, scratch, other repos |
-
-**When work spans trackers** — which is normal, not edge-case — decide
-ownership by *subject*: an issue lives with the code/area it tracks. A
-Zenflow-coordination evaluation is a workspace concern → `system-*`, even
-if discovered while working in the skills repo. Don't shoehorn
-cross-cutting work into the local tracker with a foreign prefix.
-
-**To address an issue outside the local tracker**, use `--db`:
-
-```bash
-# from anywhere — read/write a foreign tracker explicitly
-br show system-zenflow-eval-05k --db ~/Me/workspace/system/.beads/beads.db
-br comments add --actor "$ACTOR" system-zenflow-eval-05k \
-  --db ~/Me/workspace/system/.beads/beads.db --message "..."
-
-# or cd into the tracker's repo and let auto-discover find it
-cd ~/Me/workspace/system && br show system-zenflow-eval-05k
-```
-
-**Don't `br show <foreign-id>` from the local tracker without `--db`** — it
-will look in the wrong DB and report "not found" (or worse, a collision).
-The prefix is your routing key, but the path is your responsibility.
-
-**When you don't know where a prefix lives**, enumerate the trackers:
-
-```bash
-find ~/Me -maxdepth 4 -name .beads -type d 2>/dev/null
-# then br where --db <candidate>/beads.db | grep prefix
-```
-
-### Dependencies
-
-```bash
-br dep add <child> <parent>          # child depends on parent
-br dep add <id> <depends-on> --type blocks  # Explicit block type
-br dep remove <child> <parent>       # Remove dependency
-br dep list <id> --json              # List dependencies for issue
-br dep tree <id> --json              # Show dependency tree
-br dep cycles --json                 # Find circular deps (MUST be empty!)
-```
-
-**Critical:** `br dep cycles` must return empty. Circular dependencies break the dependency graph and make `br ready` unreliable.
-
-### Labels
-
-```bash
-br label add <id> backend auth       # Add multiple labels
-br label remove <id> urgent          # Remove label
-br label list <id>                   # List issue's labels
-br label list-all                    # All labels in project
-```
-
-### Comments
-
-```bash
-ACTOR="${BR_ACTOR:-assistant}"
-br comments add --actor "$ACTOR" <id> --message "Triage note" --json
-br comments list <id> --json
-```
-
-For substantial text (reports, briefs, reviews), use `--file <path>` rather
-than inlining — shell-quoting multi-line markdown with backticks, flags, or
-quotes is a transport risk.
-
-**Where reports belong.** A report that describes work done *on this ticket*
-(the work log, the outcome, what was delivered) belongs **as a comment on
-the ticket**, not as a free-standing file. The ticket is the durable record;
-its comment thread is the narrative. A report detached from its ticket is
-orphaned context. Reserve standalone docs (`log/`, `docs/`) for reports
-*about* the work that span multiple tickets or feed future decisions (e.g. a
-supervisor post-mortem, an architecture finding) — and even then, link the
-doc from the relevant ticket comment.
-
-### Sync (EXPLICIT -- never automatic)
-
-```bash
-br sync --flush-only                 # Export DB to JSONL (before git commit)
-br sync --import-only                # Import JSONL to DB (after git pull)
-br sync --status                     # Check sync status
-```
-
-Workflow after making changes:
-```bash
-br sync --flush-only
-git add .beads/ && git commit -m "Update issues"
-```
-
-Workflow after pulling:
-```bash
-git pull
-br sync --import-only
-```
-
-### System and Diagnostics
-
-```bash
-br doctor                            # Full diagnostics
-br stats --json                      # Project statistics
-br config list                       # Show all configuration
-br config get id.prefix              # Get specific value
-br config set defaults.priority=1    # Set value
-br where                             # Show workspace location
-br version                           # Show version
-br upgrade                           # Self-update (if enabled)
-br lint --json                       # Lint issues for problems
-```
-
-## Priority Scale
-
-| Priority | Meaning | Use numbers, not words |
-|----------|---------|------------------------|
-| 0 | Critical | Immediate action required |
-| 1 | High | Important, do soon |
-| 2 | Medium (default) | Normal priority |
-| 3 | Low | When time permits |
-| 4 | Backlog | Future consideration |
-
-## Issue Types
-
-`task`, `bug`, `feature`, `epic`, `question`, `docs`
-
-## Output Formats
-
-| Flag | Use case |
-|------|----------|
-| `--json` | Default for agents -- full structured data |
-| `--format toon` | Token-optimized alternative for context-window-sensitive agents |
-| (no flag) | Human-readable terminal output with colors |
-
-## bv Integration
-
-**CRITICAL:** Never run bare `bv` -- it launches interactive TUI and blocks.
-
-```bash
-# Always use --robot-* flags:
-bv --robot-next                      # Single top pick + claim command
-bv --robot-triage                    # Full triage with recommendations
-bv --robot-plan                      # Parallel execution tracks
-bv --robot-insights | jq '.Cycles'   # Check graph health (must be empty)
-bv --robot-priority                  # Priority misalignment detection
-bv --robot-alerts                    # Stale issues, blocking cascades
-```
-
-## Agent Mail Coordination
-
-Use bead ID as thread_id for multi-agent coordination:
-
-| Concept | Value |
-|---------|-------|
-| Mail `thread_id` | `bd-###` (the issue ID) |
-| Mail subject | `[bd-###] ...` |
-| File reservation `reason` | `bd-###` |
-| Commit messages | Include `bd-###` for traceability |
-
-```python
-# 1. Reserve files for bead
-file_reservation_paths(..., reason="bd-123")
-
-# 2. Announce work in thread
-send_message(..., thread_id="bd-123", subject="[bd-123] Starting...")
-
-# 3. Do work...
-
-# 4. Close bead and release
-br close bd-123 --reason "Completed"
-release_file_reservations(...)
-```
-
-## Session Ending Pattern
-
-Before ending any work session:
-
-```bash
-git pull --rebase
-br sync --flush-only
-git add .beads/ && git commit -m "Update issues"
-git push
-git status  # MUST show "up to date with origin"
-```
-
-## Standard Agent Workflow (Full)
-
-```bash
-ACTOR="${BR_ACTOR:-assistant}"
-
-# 1. Verify workspace
-br where
-br ready --json
-br blocked --json
-br list --status open --sort priority --json
-
-# 2. Pick highest-priority ready work
-br show <id> --json
-
-# 3. Claim it
-br update --actor "$ACTOR" <id> --status in_progress --claim
-
-# 4. Do work...
-
-# 5. Close with evidence
-br close --actor "$ACTOR" <id> --reason "Implemented X in commit abc123"
-
-# 6. Check queue impact
-br ready --json
-br blocked --json
-
-# 7. Sync to git
-br sync --flush-only
-git add .beads/ && git commit -m "feat: X (<id>)"
-git push
-```
-
-## Triage Decision Matrix
-
-Classify each issue into exactly one category:
-
-| Classification | Action |
-|---------------|--------|
-| `implemented` | Close with evidence (commit/PR/file/behavior) |
-| `out-of-scope` | Close with explicit boundary reason |
-| `needs-clarification` | Comment with specific unanswered questions |
-| `actionable` | Keep open, correct status/priority/labels/deps |
-
-During large triage efforts, checkpoint every few updates:
-```bash
-br ready --json
-br blocked --json
-```
-
-## Anti-Patterns
-
-- Running `br sync` without `--flush-only` or `--import-only`
-- Forgetting sync before git commit
-- Creating circular dependencies
-- Running bare `bv` (blocks session)
-- Assuming auto-commit behavior (br NEVER auto-commits)
-- Inventing evidence for closure -- if unsure, comment instead
-- Modifying unrelated issues during triage
-- Adding speculative dependencies
-
-## Storage Layout
-
-```
-.beads/
-  beads.db        # SQLite database (primary storage)
-  beads.db-shm    # SQLite shared memory (WAL mode)
-  beads.db-wal    # Write-ahead log
-  issues.jsonl    # JSONL export (for git)
-  config.yaml     # Project configuration
-  metadata.json   # Workspace metadata
-```
-
-## Troubleshooting
-
-```bash
-br doctor                    # Full diagnostics
-br dep cycles                # Must be empty
-br config list               # Check settings
-which br                     # Verify br is installed
-```
-
-**"Database locked"**: Check for other `br` processes with `pgrep -f "br "`.
-
-**Worktree error** (`'main' is already checked out`):
-```bash
-git branch beads-sync main
-br config set sync.branch beads-sync
-```
-
-**Verbose debugging:**
-```bash
-br -v list                   # Verbose
-br -vv list                  # Debug
-RUST_LOG=debug br list       # Detailed trace logs
-```
-
-## References
-
-| Topic | File |
-|-------|------|
-| Command cookbook | [references/COMMANDS.md](references/COMMANDS.md) |
-| Configuration details | [references/CONFIG.md](references/CONFIG.md) |
-| Troubleshooting guide | [references/TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) |
-| Closedown ceremony (clean close with durable record) | [references/CLOSEDOWN.md](references/CLOSEDOWN.md) |
-| Multi-agent integration | [references/INTEGRATION.md](references/INTEGRATION.md) |
+<!-- TOC: Scope | Required Workflow | Operating Rules | Related -->
+
+# br -- Beads Rust Issue Tracker
+
+`br` is the local-first issue tracker. This skill carries only the operating
+rules that prevent a wrong action mid-task — not the command reference. For
+exact command shapes, flags, JSON shapes, and the full gotcha list, consult
+the `br` cheatsheet.
+
+## Scope
+
+`br` tracks issue lifecycles, priorities, dependencies, and ready/blocked
+state across one or more `.beads/` trackers. Use it to find actionable work,
+claim and close issues, and manage the dependency graph that gates `br ready`.
+
+How and when to triage, commit, or coordinate across agents belongs to the
+execution, VCS, and coordination skills — not here. This skill owns `br`
+operation only.
+
+## Required Workflow
+
+The load-bearing order, by command name (full syntax in the cheatsheet):
+
+1. `br ready` — find unblocked work; `br show <id>` to read the contract.
+2. `br update --claim` — claim and move to `in_progress`.
+3. Do the work.
+4. `br close --reason` — close with evidence (commit SHA, file, or behaviour).
+5. Commit `.beads/` — the JSONL is already current (see Operating Rules).
+
+## Operating Rules
+
+These are the gotchas that cause a *wrong action* (not just a forgotten flag)
+if an agent doesn't internalize them on the way in:
+
+- **Writes auto-export.** Every mutation writes `issues.jsonl` immediately.
+  Commit `.beads/` directly — no flush step. The only manual sync is
+  `br sync --import-only` **after `git pull`** (the pull may bring in JSONL
+  written elsewhere). `--flush-only` earns its keep only for bulk triage
+  paired with `--no-auto-flush`.
+- **JSON shapes are not uniform.** `br ready`/`br blocked` return **arrays**;
+  `br list` returns `{issues, total, ...}`; `br count` returns
+  `{groups, total}`. Assuming they match makes `jq` fail silently. Exact
+  recipes live in the cheatsheet.
+- **Cross-tracker routing.** Each tracker owns a prefix (e.g. `agents-*`,
+  `system-*`). A foreign-prefix ID needs `--db <path>` or a `cd` into the
+  owning repo — bare `br show <foreign-id>` looks in the wrong DB and reports
+  "not found" (or worse, a collision).
+- **Close reasons are the durable record.** `--reason` is where the outcome
+  and evidence live. Don't close without it; if you're unsure the work is
+  verifiably done, leave a comment instead of closing.
+- **Never run bare `bv`.** It launches an interactive TUI that blocks the
+  session. Always use `--robot-*` flags (`--robot-next`, `--robot-triage`).
+- **No cycles.** `br dep cycles` must return empty — circular dependencies
+  break the graph and make `br ready` unreliable.
+
+## Related
+
+- `br` cheatsheet — command shapes, flags, JSON-shape `jq` recipes, full
+  gotcha list, and storage layout. This is the primary reference.
+- `git-vcs` / `git-change-manage` — how to commit and end a session (the
+  `.beads/` commit follows the same rules as any other).
+- `execution-spine` / `supervisor` — triage method and phase management.

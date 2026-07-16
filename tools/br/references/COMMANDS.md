@@ -137,9 +137,13 @@ br comments list <id> --json
 
 ## Sync
 
+Writes auto-export to JSONL, so `--flush-only` is a no-op after any
+normal write. The two real uses: `--import-only` after `git pull`, and
+`--flush-only` for bulk triage paired with `--no-auto-flush`.
+
 ```bash
-br sync --flush-only                         # Export DB to JSONL
-br sync --import-only                        # Import JSONL to DB
+br sync --flush-only                         # Export DB to JSONL (bulk triage only — no-op after a normal write)
+br sync --import-only                        # Import JSONL to DB (after git pull)
 br sync --status                             # Check sync status
 ```
 

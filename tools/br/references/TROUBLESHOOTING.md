@@ -39,12 +39,18 @@ br search "keyword" --json
 
 ### "Prefix mismatch"
 
+The JSONL carries an ID prefix that doesn't match this tracker's
+`id.prefix`. There is no skip-validation flag — resolve the prefix
+agreement instead:
+
 ```bash
-# Check your prefix
+# 1. Check this tracker's prefix
 br config get id.prefix
 
-# Import with validation skip (careful!)
-br sync --import-only --skip-prefix-validation
+# 2. Either set the tracker prefix to match the JSONL,
+#    or edit the JSONL source so its IDs match this tracker.
+#    (IDs are namespaced by prefix; a mismatch means the data isn't yours.)
+br config set id.prefix=<correct-prefix>
 ```
 
 ### Worktree Error
