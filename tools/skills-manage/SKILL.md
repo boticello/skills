@@ -2,13 +2,14 @@
 name: skills-manage
 description: >-
   How agent skills are organized, authored, and deployed across harnesses. Use
-  whenever creating, editing, gathering, or fetching skills; when an agent needs
-  to know where skills live or why not to edit them in place; or when questions
-  arise about the deploy script, manifests, scoping (global vs project), or
-  vendor provenance. Load before scaffolding a new skill or touching any
-  ~/.agents/skills or ~/.codex/skills directory. ALSO load alongside the
-  skill-creator plugin skill — it overrides skill-creator's "where skills live"
-  guidance for this machine's canonical-store model.
+  whenever creating, editing, gathering, fetching, reviewing, restructuring, or
+  trimming a skill; when an agent needs to know where skills live or why not to
+  edit them in place; or when questions arise about the deploy script,
+  manifests, scoping (global vs project), or vendor provenance. Load before
+  scaffolding a new skill or touching any ~/.agents/skills or ~/.codex/skills
+  directory. ALSO load alongside the skill-creator plugin skill — it overrides
+  skill-creator's "where skills live" guidance for this machine's
+  canonical-store model.
 ---
 
 # skills-manage
@@ -235,6 +236,29 @@ deploys globally exactly as before scoping existed.
 To change what's global, edit `global-manifest.toml` directly. Skills not
 listed there become available only via a project's `add`.
 
+## Skill ↔ cheatsheet pairing
+
+A tool-operating skill (one whose job is "use tool X correctly") should
+**delegate command shapes to its cheatsheet** and carry only the operating
+rules an agent needs mid-task — the gotchas that cause a *wrong action*, not
+just a forgotten flag. The cheatsheet is the reference home (commands, flags,
+JSON shapes, sort keys); the skill loads the mental model into context when
+triggered.
+
+This keeps tool skills short (60–90 lines) and avoids duplicating command
+syntax in two places that drift apart. The skill's description should
+self-route: "for command shapes, use the `<tool>` cheatsheet."
+
+**Exemplar:** `cbm` (72 lines) — its body carries scope, required-workflow
+order, and guardrails only; it says "for exact command shapes... consult the
+`cbm` cheatsheet." `br` follows the same pattern. Both the skill and its
+cheatsheet cross-reference each other.
+
+When a tool already has a cheatsheet and a skill, check that both point at
+each other (the skill's Related section → cheatsheet; the cheatsheet's See
+Also → skill). When trimming an over-long tool skill, the cheatsheet is
+usually where the cut command reference should land.
+
 ## Common mistakes
 
 - **Creating a skill in `~/.agents/skills/` or `~/.codex/skills/`.** It will be
@@ -256,6 +280,8 @@ listed there become available only via a project's `add`.
 
 ## Related
 
+- `cheatsheets` skill — the sibling reference tier. Tool skills pair with
+  cheatsheets; see "Skill ↔ cheatsheet pairing" above.
 - `docs/scoping-rationale.md` (in canonical) — full design rationale
 - `README.md` (in canonical) — the user-facing overview
 - `allowlist.txt` (in canonical) — target entries never removed (`.system`,

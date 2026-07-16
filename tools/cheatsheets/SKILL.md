@@ -220,3 +220,15 @@ After creating or editing a sheet, validate:
 - Are all code blocks language-tagged?
 - Is the file between 50–130 lines (or valid if shorter/longer)?
 - Are tags present and appropriate (1–3 tags, first matches tool name)?
+
+## Related
+
+- `skills-manage` skill — how skills are organized, authored, and deployed.
+  Cheatsheets are the sibling reference tier: a tool-operating skill points
+  at its cheatsheet for command shapes (see `skills-manage` → "Skill ↔
+  cheatsheet pairing"). When a tool has both, cross-reference them in both
+  directions (the sheet's See Also → skill; the skill's Related → sheet).
+- Cheatsheets live in their own canonical repo (`~/Me/repos/cheatsheets/`),
+  separate from skills (`~/Me/repos/skills/`), but a sheet that documents a
+  paired skill deploys alongside it. Skill edits land in `~/Me/repos/skills/`;
+  sheet edits land here.

@@ -178,3 +178,10 @@ of the primary artifact. Before declaring any ZCode wiring step complete:
 If the only evidence is a proxy that answers a *different* question than the
 one you need ("does the CLI see it?" when you need "does the app see it?"),
 that is not verification — keep going.
+
+## Related
+
+- `zcode` cheatsheet (`cheat zcode`) — command/flag reference for the
+  opencode CLI, config-file locations, and the import-MCP one-liners. This
+  skill carries the reasoning and verification rules; the cheatsheet carries
+  the command shapes.
