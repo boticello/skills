@@ -9,7 +9,7 @@
 # NOTE: adding a new skill to canonical requires adding it here too, or it
 # won't deploy globally. Run reconcile/deploy --dry-run to catch drift.
 
-# 33 skills (role-universal core)
+# 32 skills (role-universal core)
 skills = [
     "almanac",
     "bin-creator",
@@ -33,7 +33,6 @@ skills = [
     "lead",
     "mcp-manage",
     "op-env-wrap-tool",
-    "retro",
     "root-cause-debugger",
     "skills-manage",
     "spike-planning",
