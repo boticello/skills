@@ -76,12 +76,17 @@ Path: `Documents/<source_date or version> - <Title>.md` (use the document's
 own date, not today's). The note is the *processed hub*; the source is
 linked, never duplicated.
 
-**Use `Templates/Document.md` as the specification.** It carries the full
-schema contract (frontmatter, naming, FK fields, promotion rules) in a
-spec block at the top, plus the working skeleton. Don't reinvent the
-structure; copy from the template. The template and `KB STRUCTURE.md`
-together are the canonical schema — this skill teaches the *process*, not
-the schema.
+**Schema is enforced by [Fileclass](https://mdelobelle.github.io/fileclass/).**
+The `Document` fileClass at `_fileclasses/Document.md` is the canonical
+specification — typed frontmatter fields, controlled vocabularies as Select
+dropdowns, FK constraints as File/MultiFile. The fileClass auto-binds by path
+(`filesPaths: [Documents]`), so any note created in `Documents/` inherits the
+schema and gets validated in-editor. Use `Templates/Document.md` for the
+skeleton body sections (below the frontmatter); use the fileClass for the
+frontmatter itself. Validate with `fileclass validate --fileclass Document`.
+
+This skill teaches the *process*; the fileClass and `KB STRUCTURE.md` together
+are the canonical schema.
 
 If a delegation brief exists for this document, it points at the same
 templates — schema stays in one place.
