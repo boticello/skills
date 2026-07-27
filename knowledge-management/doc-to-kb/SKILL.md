@@ -72,28 +72,19 @@ transcripts. Capture:
 
 ### 2. Create the document note
 
-Path: `Documents/<YYYY-MM-DD or version> - <Title>.md` (use the document's own
-date, not today's). The note is the *processed hub*; the source is linked,
-never duplicated.
+Path: `Documents/<source_date or version> - <Title>.md` (use the document's
+own date, not today's). The note is the *processed hub*; the source is
+linked, never duplicated.
 
-Frontmatter:
+**Use `Templates/Document.md` as the specification.** It carries the full
+schema contract (frontmatter, naming, FK fields, promotion rules) in a
+spec block at the top, plus the working skeleton. Don't reinvent the
+structure; copy from the template. The template and `KB STRUCTURE.md`
+together are the canonical schema — this skill teaches the *process*, not
+the schema.
 
-```yaml
----
-type: document
-title: <document title>
-role: <document role>
-temporal_status: <current|historical|superseded|unknown>
-authority: <proposed|approved|implemented|unverified>
-source_path: <relative path from engagement root>
-source_date: <document's own date, if known>
-author: <if stated>
-format: <pptx|pdf|docx|xlsx|md>
-pages: <count>
-verified: false   # flips true when reconciled against current state
-created: <today>
----
-```
+If a delegation brief exists for this document, it points at the same
+templates — schema stays in one place.
 
 ### 3. Extract — what the document says
 
