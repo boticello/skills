@@ -138,6 +138,24 @@ If lint reports broken links:
 
 Only commit once `kb lint` exits 0.
 
+### 7. Pause, then interpret (paired skill)
+
+Extraction is *what was said*. For substantive meetings (handover, steerco,
+workshop, legal), follow with the paired skill **`kb-juice-squeeze`** —
+*what it means*. That pass re-mines the source for under-extracted content,
+reads the subtext, projects forward into risks and scope traps, forms/updates
+working hypotheses, and advises on operating posture. It enriches four living
+docs: stakeholder assessment, engagement operating notes, risk register,
+hypotheses register.
+
+Run them **separately, with a pause between**. Interpretation done in
+extract-mode is worse — you're still inside the source, not above it. And
+don't run the second pass on every meeting; standups and routine 1:1s don't
+warrant it.
+
+(If the four interpretive docs don't yet exist, the first run of
+`kb-juice-squeeze` creates them; subsequent runs enrich.)
+
 ## Meeting-type table
 
 The meeting type drives extraction depth. Set `meeting_type` in frontmatter;
