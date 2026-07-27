@@ -110,12 +110,33 @@ For every named person, organisation, system, concept, data asset, project:
 
 ### 6. Verify, then commit
 
-- `obsidian orphans` — anything unreachable? (expected: attachments,
-  templates, the hub itself)
-- `obsidian backlinks <sample-entity>` — does a key entity have the expected
-  inbound links?
-- Vault-wide broken-link check.
-- Git commit.
+Run `kb lint` (the engagement KB linter) — it aggregates all checks in one
+command and exits non-zero on critical issues:
+
+```
+kb lint              # all checks; exit 1 on broken links / missing frontmatter
+kb links             # broken-link report only (uses obsidian CLI under the hood)
+kb orphans           # unreachable notes (filters attachments/templates/hub)
+kb counts            # Q-sequence + required-frontmatter completeness
+kb verify            # the verified:false queue, grouped by type
+kb drift             # hub stated counts vs reality (catches stale hub text)
+kb stale <regex>     # references to an old/renamed name (post-rename safety)
+```
+
+The lint delegates graph queries (links, orphans) to the `obsidian` CLI, which
+is authoritative for Obsidian's link resolution — a regex parser can't replicate
+alias/attachment/short-form rules. The Ruby layer adds the schema-aware checks
+(frontmatter, FK, drift) the CLI doesn't know about.
+
+If lint reports broken links:
+- Aliased display links like `[[Kunal]]` are **broken** if the note is
+  `Kunal Yadav.md` — aliases in frontmatter don't make `[[Kunal]]` resolve.
+  Fix to `[[Kunal Yadav|Kunal]]` (target|display).
+- Missing stubs → create them, or delink to plain text.
+- Path-style links to files outside the vault (e.g. `[[reference/...]]`) →
+  convert to plain text with the path in backticks.
+
+Only commit once `kb lint` exits 0.
 
 ## Meeting-type table
 
