@@ -7,8 +7,12 @@ description: >-
   consultant on posture. Enriches four living docs (stakeholder assessment,
   engagement operating notes, risk register, hypotheses register). Use after
   meeting-to-kb has run on a substantive meeting (handover, steerco,
-  workshop); not every meeting warrants it (standups don't). Distinct from
-  meeting-to-kb: that's *what was said*, this is *what it means*.
+  workshop), or after doc-to-kb has run on a substantive document (an
+  architecture deck, a SOW, a governance artefact). In the document case this
+  pass is *reconciliation* — testing each historical claim against current
+  state. Not every source warrants it (standups don't; routine 1:1s don't;
+  junk docs don't). Distinct from the extraction skills: those are *what was
+  said*, this is *what it means*.
 license: MIT
 domain: knowledge-management
 role: specialist
@@ -18,6 +22,8 @@ triggers:
   - juice squeeze
   - squeeze the juice
   - interpret this meeting
+  - interpret this document
+  - reconcile this document
   - what's the subtext
   - what does this mean for the engagement
   - deep read
@@ -27,11 +33,12 @@ triggers:
 
 # kb-juice-squeeze — interpretation pass over an engagement KB
 
-The second-pass analytical skill, paired with [[meeting-to-kb]]. Extraction
-runs first ("what was said?"); this runs after ("what does it mean?"). The two
-are deliberately separate skills because they require different cognitive
-modes — close-reading the source vs stepping back and reading across what was
-extracted.
+The second-pass analytical skill. Pairs with two extraction skills:
+[[meeting-to-kb]] for meeting transcripts, [[doc-to-kb]] for documents.
+Extraction runs first ("what was said / what does this doc claim?"); this
+runs after ("what does it mean?"). The two stages are deliberately separate
+skills because they require different cognitive modes — close-reading the
+source vs stepping back and reading across what was extracted.
 
 **Read the engagement's `KB STRUCTURE.md` and the four interpretive docs
 first.** This skill carries the *process*; those carry the *state*.
@@ -40,8 +47,12 @@ first.** This skill carries the *process*; those carry the *state*.
 
 - After `meeting-to-kb` has run on a substantive meeting: handover, steerco,
   workshop, legal. These have enough texture to interpret.
-- **Not** after every meeting. Standups and routine 1:1s don't warrant it —
-  the extraction record stands on its own.
+- After `doc-to-kb` has run on a substantive document: an architecture deck,
+  a SOW, a governance/RACI artefact, a strategy doc. For documents this pass
+  is *reconciliation* — testing historical claims against current state (see
+  "Source-type variations" below).
+- **Not** after every source. Standups, routine 1:1s, and junk docs don't
+  warrant it — the extraction record stands on its own.
 - Run with a deliberate pause after extraction. Interpretation done in
   extract-mode is worse — you're still inside the source, not above it.
 
@@ -174,6 +185,81 @@ watch-fors) and [[Risk register]] (the explicitly political risks).
 - **Treating confidence numbers as measurements.** They're subjective
   estimates forcing honesty about how sure you are. Their value is tracking
   drift, not precision.
+
+## Source-type variations
+
+The five moves above are written for meetings. Documents get the same five
+moves, but the focus shifts because documents are *historical by default* —
+a meeting is a fact about today, a document is a hypothesis about the time it
+was written. For documents, this skill is *reconciliation*: testing each
+claim against current state.
+
+### When the source is a document (paired with `doc-to-kb`)
+
+The five moves, refocused:
+
+**1. Re-mine → "what's between the lines that extraction missed?"**
+- Slide decks hide claims in speaker-note tone, in what's *not* shown (a
+  section that should exist but doesn't), in the M&A subtext (an acquired
+  company's product appearing as a "standard").
+- Numbers matter: dates, version numbers, slide counts, RACI names. A named
+  approver on a 2025 deck who's now gone is a finding (see the [[Clarus -
+  Senior Director of Data and Analytics (former)|fired-director]] pattern).
+- Catalogue-type decks (12 outputs, 8 capabilities) often have *one* entry
+  that's quietly different — flagged superseded, marked TBD, missing a
+  sign-off. Hunt for those.
+
+**2. Read the subtext → "is this political or factual?"**
+- Architecture decks are advocacy documents. A "standard" is often an
+  aspiration someone was pushing; a "deviation" is often a battle lost.
+- RACI matrices encode politics in tabular form: who's accountable vs
+  informed reveals where power sat at writing time.
+- Approval chains (Georgia → Dirk → Ian) are governance evidence — but
+  *historical* governance evidence, possibly dead. Test against
+  [[Risk register#R-001 — Sponsorship vacancy after the director firing|the
+  firing's aftermath]].
+
+**3. Project forward → "what does this mean now?"** — this is the *core* of
+document reconciliation, and the move that differs most from meetings:
+- For each `historical-intent` or `proposed` claim extracted by `doc-to-kb`,
+  ask: was this implemented? Adopted? Superseded? Promote the claim's
+  evidence-state accordingly (`historical-intent` → `current-verified`,
+  `current-unverified`, or stays historical).
+- For each named system / standard / approach, ask: is it still governing?
+  Generate a revalidation question if unknown. (e.g. "Is Calandra still the
+  governing standard?" → [[Questions/Q-009 - Authoritative 2025 outputs]].)
+- For each stated decision-right or approver, ask: does this still hold?
+  The 2025 RACI may have died with the fired director. Test against
+  [[Questions/Q-010 - Decision rights and ownership]].
+- For each *assumption the current engagement is inheriting*, ask: is it
+  verified? Unverified inheritances are the highest-risk document output —
+  flag as a risk if so.
+
+**4. Form/update hypotheses → "what should I track?"**
+- Documents seed architecture hypotheses: "X is the governing standard" →
+  H-NNN with confidence = 0.5 until verified.
+- A 2025 doc claiming "approved" status deserves a hypothesis: "the
+  approval actually held" (often it didn't).
+- Reconciliation *updates* these as evidence comes in — confidence moves
+  toward 0.9 (verified) or 0.1 (superseded).
+
+**5. Advise → "what would the wise consultant say?"**
+- The most valuable document-specific advice: which parts of the historical
+  record can you safely build on, and which must you re-verify first?
+- Frame the document's *value to the current engagement*, not its original
+  intent. A 2025 architecture deck is useful as vocabulary and as a list of
+  things-to-test, not as a spec.
+
+### Document-specific anti-patterns
+
+- **Treating the document as a fact base.** A 2025 deck is a set of
+  hypotheses about intended state. Reconcile, don't import.
+- **Skipping reconciliation.** Extraction without reconciliation leaves
+  `historical-intent` claims sitting as if they were facts.
+- **Asserting the political reading of an architecture deck as fact.**
+  Entertain it; hypothesise it; don't assert it.
+- **Bulk-importing every named system into the graph.** Promote only what's
+  durable and cited; the rest stays in the document note.
 
 ## The four docs (living state)
 
