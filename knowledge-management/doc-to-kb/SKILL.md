@@ -109,28 +109,16 @@ Body sections:
 
 ### 4. The evidence-state vocabulary (per claim)
 
-This is the document-specific insight that doesn't apply to meetings. Each
-extracted claim carries one of:
+Each extracted claim is tagged with one of six evidence states
+(`historical-intent` / `proposed` / `approved` / `implemented` /
+`current-unverified` / `current-verified`). The vocabulary is defined in
+`KB STRUCTURE.md` (cross-cutting — applies to documents, data assets,
+anything historical). Tag inline at the end of each claim bullet:
+`... uses Calandra. _(historical-intent, slide 5)_`.
 
-| State | Meaning |
-|---|---|
-| `historical-intent` | the document states an intention, plan, or target — not a fact about reality |
-| `proposed` | a design or decision put forward for approval |
-| `approved` | the document records that something was signed off |
-| `implemented` | the document asserts this is now built/adopted (still unverified unless checked) |
-| `current-unverified` | believed current but not yet checked against the live platform |
-| `current-verified` | checked against current state and confirmed |
-
-Why this matters: it operationalises the "treat 2025 material as hypothesis"
-decision ([[D-003 - Treat 2025 material as hypothesis]]). Instead of a single
-stance on the whole document, each claim gets its own state. A Base query for
-`historical-intent` claims about the architecture surfaces everything you
-need to validate; a query for `current-verified` surfaces what's safe to rely
-on. Most claims in a 2025 deck start as `historical-intent` or `proposed` and
-get promoted only after reconciliation.
-
-**Convention:** tag inline at the end of each bullet —
-`... the target architecture uses Calandra. _(historical-intent)_`
+This operationalises [[Decisions/D-003 - Treat 2025 material as hypothesis]]:
+each claim carries its own state, queryable by Base. Most claims in a 2025
+deck start as `historical-intent` and promote through reconciliation.
 
 ### 5. Promote into the graph
 
@@ -177,9 +165,15 @@ reconciliation wants stepping back and comparing across the KB.
 
 ### 7. Verify and commit
 
-`kb lint` for structural integrity. Then commit. Note: a document extraction
-is rarely "done" after one pass — claims start as `historical-intent` and get
-promoted through reconciliation over the engagement.
+Two complementary checks (see the `fileclass` and `obsidian` cheatsheets):
+
+- `fileclass validate --fileclass Document` (and per promoted type) — schema
+  violations, in-editor and CI-friendly.
+- `kb lint` — graph integrity (broken links, orphans, drift).
+
+Then commit. Note: a document extraction is rarely "done" after one pass —
+claims start as `historical-intent` and get promoted through reconciliation
+over the engagement.
 
 ## Document-type variations
 
@@ -232,10 +226,18 @@ document*. It's a technique, not the universal pattern.
 
 ## Related
 
-- Engagement `KB STRUCTURE.md` — schema contract.
+- Engagement `KB STRUCTURE.md` — schema contract (note-type table, evidence
+  states, document model, promotion rules). Read first.
+- **`fileclass` cheatsheet** (`cheat fileclass`) — field types, fileClass
+  markdown format, validation commands, the FK-via-Base-view pattern. The
+  canonical reference for schema and CLI operations; this skill doesn't
+  duplicate it.
+- **`obsidian` cheatsheet** (`cheat obsidian`) — graph operations, move,
+  eval escape hatch.
 - [[meeting-to-kb]] — the meeting analogue. Same source-vs-processed
   separation; different temporal handling (meetings are current; documents
   are hypotheses).
 - [[kb-juice-squeeze]] — paired second pass. Gains a `source_type: document`
   reconciliation mode for documents.
-- `kb` CLI — structural lint.
+- `kb` CLI — graph-only lint (broken links, orphans, drift). Schema
+  validation is Fileclass's job (`fileclass validate`).
