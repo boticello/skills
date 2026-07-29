@@ -1,15 +1,18 @@
 ---
 name: skills-manage
 description: >-
-  How agent skills are organized, authored, and deployed across harnesses. Use
-  whenever creating, editing, gathering, fetching, reviewing, restructuring, or
-  trimming a skill; when an agent needs to know where skills live or why not to
-  edit them in place; or when questions arise about the deploy script,
-  manifests, scoping (global vs project), or vendor provenance. Load before
-  scaffolding a new skill or touching any ~/.agents/skills or ~/.codex/skills
-  directory. ALSO load alongside the skill-creator plugin skill — it overrides
-  skill-creator's "where skills live" guidance for this machine's
-  canonical-store model.
+  How agent skills are organized, authored, and deployed across harnesses, plus
+  the editorial judgment for writing a good skill. Use whenever creating,
+  editing, gathering, fetching, reviewing, restructuring, or trimming a skill;
+  when judging whether a skill is too long, under-triggering, or mixing
+  reference with technique; when an agent needs to know where skills live or
+  why not to edit them in place; or when questions arise about the deploy
+  script, manifests, scoping (global vs project), or vendor provenance. Load
+  before scaffolding a new skill, reviewing a skill's quality, or touching any
+  ~/.agents/skills or ~/.codex/skills directory. ALSO load alongside the
+  skill-creator plugin skill — it overrides skill-creator's "where skills live"
+  guidance for this machine's canonical-store model, and adds the quality
+  guidance skill-creator lacks.
 ---
 
 # skills-manage
@@ -141,6 +144,57 @@ why no per-harness manifests, why copies not symlinks), read
 made in `~/.agents/skills/` or `~/.codex/skills/` will be overwritten on the
 next deploy.
 
+## Skill quality (guidance, not a gate)
+
+`skill-creator` covers the authoring loop (intent capture, drafting, test
+prompts, iteration). This section carries the editorial judgment that decides
+whether a skill is *good* — the kind of judgment that's easy to miss when
+authoring and that prevents the common failure modes (over-long skills, under-
+triggering, reference bloat). Apply it when creating or revising a skill.
+
+**Skill = technique; reference material lives elsewhere.** A skill carries
+judgment and operating rules — the gotchas that cause a *wrong action*, the
+decision rules, the workflow order. Commands, flag tables, schemas, and
+man-page-grade detail do not belong in the skill body; they go in a sibling
+`references/` file or a `cheat <tool>` sheet (see "Skill ↔ cheatsheet pairing").
+If a skill is growing past ~150 lines, the cut almost always lands on reference
+content that has a better home. The `br` skill is the exemplar: ~100 lines of
+operating rules, with an imperative pointer to its cheatsheet for command
+shapes.
+
+**Length.** Tool-operating skills: 60–100 lines. Procedure/judgment skills:
+100–180. Past ~200, look hard for reference content to offload or for two
+concerns that should be two skills. A skill that's slightly too short is
+always better than one that's slightly too long — same principle as the
+cheatsheets skill's 80% rule.
+
+**Trigger quality.** A skill that doesn't fire is dead weight. Two levers:
+1. Write the `description` as an imperative that names the natural-language
+   phrasings a user actually says ("Use whenever the user mentions X, Y, or
+   asks to Z"), not as a dry capability statement. Models under-trigger on
+   vague descriptions.
+2. Add an explicit `triggers:` list (a YAML list of literal tokens) when the
+   description alone might miss a common surface form. `br`, `lark-crm`, and
+   `cheatsheets` all use this belt-and-suspenders pattern.
+Test the trigger mentally: would the skill load on the request you're trying
+to handle? The `cheatsheets` skill historically failed this — it didn't fire
+on "edit the cheatsheet" because its description buried the trigger noun.
+
+**Progressive disclosure.** Metadata (name + description) is always in context;
+the body loads on trigger; `references/` files load on demand. Keep the
+description short; push deep domain detail into `references/` and point at it
+from the body ("before any write, read `references/foo.md`").
+
+**Before you deploy, confirm:**
+- The `description` would actually fire on a realistic user request (not just
+  describe the skill's capability).
+- Reference-grade content (full command lists, flag tables, schemas) lives in
+  a cheatsheet or `references/`, not the body — unless it's the one piece of
+  reference that has no other home.
+- No inline ticket references (`bd-xxx`) in the body — tickets close and leave
+  dangling pointers. State the guidance inline instead.
+- Length is within the targets above, or there's a conscious reason it isn't.
+
 ## Deploy commands
 
 ```bash
@@ -224,14 +278,15 @@ vendored skill from `SOURCES.toml`, then deploy.
 
 Vendored skills deploy alongside authored ones — no distinction at the target.
 Skills with `UNKNOWN` provenance in `SOURCES.toml` need their upstream
-verified (see br ticket `skills-kn9`).
+verified before trusting them — resolve the url + commit and update
+`SOURCES.toml`.
 
 ## The global default set
 
-`global-manifest.toml` lists which canonical skills ship by default. **It is
-currently a baseline listing all skills** — reclassification to a curated
-universal core is deferred (br ticket `skills-2gs`). Until then, everything
-deploys globally exactly as before scoping existed.
+`global-manifest.toml` lists the curated set of skills that ship globally by
+default. Niche, experimental, and vendored skills remain in canonical but are
+not listed — they're available only via a project's `add`. This keeps the
+global payload lean as the canonical set grows.
 
 To change what's global, edit `global-manifest.toml` directly. Skills not
 listed there become available only via a project's `add`.

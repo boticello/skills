@@ -94,7 +94,7 @@ writable until it appears in the live field list.
 | `Code` | Number | Internal number |
 | `Type` | SingleSelect | Permanent / Contract / Business Opportunity |
 | `Stage` | SingleSelect | New / Applied / In Progress / Offer / Won / Lost / On Hold |
-| `Status` | SingleSelect | Cancelled / In Progress — **overlaps `Stage`; see open decisions** |
+| `Status` | SingleSelect | Cancelled / In Progress — **redundant with `Stage`; `Stage` is authoritative. Use `Status` only to annotate a cancellation reason when `Stage = Cancelled`.** |
 | `Client` | DuplexLink → Organisations | single; `record_ids` |
 | `Primary Contact` | DuplexLink → People | single; `record_ids` |
 | `Rate` | Currency (GBP) | Number |
@@ -140,8 +140,7 @@ writable until it appears in the live field list.
 | `Link` | Url | e.g. LinkedIn |
 | `Summary` | Text | Free text |
 
-> No `Email` / `Phone` fields exist. If contact detail capture becomes a
-> recurring need, that's an open Base decision (see open decisions).
+> No `Email` / `Phone` fields exist. Do not invent them; capture contact details in `Summary` free text if needed.
 
 ### Organisations (`tblvbZpzWEVOEHAk`)
 
@@ -151,9 +150,8 @@ writable until it appears in the live field list.
 | `Person` | DuplexLink → People | back-field |
 | `Opportunity` | DuplexLink → Opportunities | back-field |
 
-> Sparse — **no `Type` or `Notes` field.** The client-vs-recruiter distinction
-> is currently inferred from the linked Person's `Role`, not stored on the
-> Organisation. An open decision (below) covers whether to add a `Type` field.
+> Sparse — **no `Type` or `Notes` field.** Infer client-vs-recruiter from the
+> linked Person's `Role`, not from the Organisation.
 
 ## Stage lifecycle rules
 
@@ -164,9 +162,9 @@ writable until it appears in the live field list.
 - **Business opportunity:** New → Applied (proposal) → In Progress (feedback loop) → Offer (verbal) → Won / Lost
 - **On Hold** may be set from any active stage when paused/ghosted.
 - **Waiting for a response** (e.g. after interview) is **not** a separate stage —
-  it stays at `In Progress`. There is no dedicated field for prose status yet;
-  see "Open Base decisions" for the candidate approach. Do not overload
-  `Summary` as a status line (it's for the opportunity description).
+  it stays at `In Progress`. There is no dedicated prose-status field; do not
+  overload `Summary` as a status line (it's for the opportunity description).
+  Use the open Activities query (`Status = Open`) to see what's being awaited.
 
 ## Mandatory fields by operation
 
@@ -239,7 +237,7 @@ is also fine if supported by the server.)
 
 ### Create an Opportunity
 1. Search Organisations for the client → `record_id`, or create (with user
-   confirmation) if missing. (No `Type` field on Orgs — see open decisions.)
+   confirmation) if missing. (No `Type` field on Orgs — infer from Person `Role`.)
 2. Search People for the primary contact → `record_id`, or create.
 3. `bitable_v1_appTableRecord_create` on `tblCfgQmxQeGyEph` (Opportunities)
    with `Title`, `Type`, `Stage`, and links as **bare id arrays**:
@@ -254,8 +252,9 @@ is also fine if supported by the server.)
 4. If the user specifies a follow-up, create a second Activity (`Status = Open`,
    `Activity Type = Chase`/`Task`, `Due Date` set) linked to the same
    Opportunity. Optionally set the original Activity's `Next Activity` → the
-   new activity **only if** it represents the next pending step (see open
-   decisions on debrief chaining).
+   new activity **only if** it represents the next pending step. A debrief call
+   is a sibling of the interview, not a child — do not use `Next Activity` for
+   it (see "Record a recruiter debrief" below).
 
 ### Record a recruiter debrief (recurring pattern for contract roles)
 An interview is often followed by a debrief call with the recruiter. Model

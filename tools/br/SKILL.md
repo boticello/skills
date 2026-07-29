@@ -3,9 +3,10 @@ name: br
 description: >-
   Use when working with the `br` (beads_rust) issue tracker: creating issues,
   triaging, managing dependencies, or finding ready work. Carries the operating
-  rules an agent needs mid-task — the auto-export sync model, cross-tracker
-  routing, and silent-failure commands. For command shapes, flags, and JSON
-  shapes, use the `br` cheatsheet.
+  rules an agent needs mid-task — the SQLite-canonical storage model (JSONL is
+  an export, never hand-edit), sync modes, cross-tracker routing, and
+  silent-failure commands. For command shapes, flags, and JSON shapes, read the
+  `br` cheatsheet at ~/Me/repos/cheatsheets/personal/br BEFORE any write.
 license: MIT
 domain: project-management
 role: specialist
@@ -27,8 +28,17 @@ metadata:
 # br -- Beads Rust Issue Tracker
 
 Local-first issue tracker. This skill carries only the rules that prevent a
-wrong action mid-task — not the command reference. Command shapes, flags, JSON
-shapes, and the full gotcha list live in the `br` cheatsheet.
+wrong action mid-task — not the command reference.
+
+**Before any operation beyond a read (`br show`/`br list`/`br ready`), read the
+`br` cheatsheet** at `~/Me/repos/cheatsheets/personal/br`. It holds the command
+shapes, flags, JSON-shape `jq` recipes, the full gotcha list, and the storage
+model. Operating from this skill alone will miss load-bearing detail.
+
+**The single most important fact:** `.beads/beads.db` (SQLite) is canonical;
+`.beads/issues.jsonl` is a generated export. **Never hand-edit `issues.jsonl`**
+except via the edit-then-`br sync --rebuild` path documented in the cheatsheet —
+normal writes re-export from the DB and silently overwrite hand edits.
 
 ## Scope
 
@@ -52,11 +62,13 @@ underneath changes. `br` supplies the verbs (`ready`, `update --claim`,
 
 The gotchas that cause a wrong action if not internalized up front:
 
-- **Writes auto-export.** Every mutation writes `issues.jsonl` immediately —
-  commit `.beads/` with no flush step. The only manual sync is
-  `br sync --import-only` after `git pull` (the pull may bring in JSONL written
-  elsewhere). `--flush-only` matters only for bulk triage paired with
-  `--no-auto-flush`.
+- **SQLite is canonical; JSONL is an export.** Every mutation writes to
+  `beads.db` and auto-exports `issues.jsonl` — commit `.beads/` with no flush
+  step. The manual sync modes: `br sync --import-only` after `git pull` (the
+  pull may bring in JSONL written elsewhere); `--flush-only` for bulk triage
+  paired with `--no-auto-flush`; `--rebuild` to make the DB match a hand-edited
+  JSONL (the only sanctioned hand-edit path, for bulk rewrites/ID renames). See
+  the cheatsheet's "Storage model" and "Sync" sections.
 - **JSON shapes are not uniform.** `br ready`/`br blocked` return arrays;
   `br list` returns `{issues, total, ...}`; `br count` returns
   `{groups, total}`. Assuming they match makes `jq` fail silently. Exact
@@ -77,8 +89,11 @@ The gotchas that cause a wrong action if not internalized up front:
 
 ## Related
 
-- `br` cheatsheet — command shapes, flags, JSON-shape `jq` recipes, full gotcha
-  list, storage layout.
+- **`br` cheatsheet** (`~/Me/repos/cheatsheets/personal/br`) — the single
+  command reference: storage model, all commands/flags, JSON-shape `jq` recipes,
+  config, sync modes, the full gotcha list, and troubleshooting. Read it before
+  any write.
+- `br-new` wrapper (`~/Me/OS/scripts/bin/br-new`) — fixes `br create -f` semantics.
 - `coordination-protocol` — owns the lifecycle this skill defers: readiness,
   claim, execution/review sequence, phase transition, and closure policy.
 - `git-vcs` / `git-change-manage` — commit and session-end workflow.
