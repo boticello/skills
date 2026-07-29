@@ -13,6 +13,16 @@ description: >-
   skill-creator plugin skill — it overrides skill-creator's "where skills live"
   guidance for this machine's canonical-store model, and adds the quality
   guidance skill-creator lacks.
+triggers:
+  - skill
+  - skills
+  - SKILL.md
+  - skills-manage
+  - skill-creator
+  - global-manifest
+  - skills-deploy
+  - .agents/skills
+  - .codex/skills
 ---
 
 # skills-manage
@@ -20,8 +30,14 @@ description: >-
 This skill documents the system that manages agent skills. It is itself a
 deployed skill — a skill that describes the system that deploys it.
 
-Load this when working with skills at all: creating, editing, fetching,
-deploying, or reconciling drift. The single most important rule is below.
+**Before editing any `SKILL.md` — yours, someone else's, or this one — this
+skill must be loaded.** Editing a skill is a skills-system operation, not a
+content task. Reaching for the Edit tool on a SKILL.md without the canonical-
+store model and the quality guidance below in context is how work gets
+destroyed (target edits mirrored away by the next deploy) and how bad skills
+get written (no trigger check, reference bloat, no length discipline). If you
+are about to touch a `.agents/skills/` or `.codex/skills/` path, or any
+`SKILL.md`, and this skill isn't loaded, stop and load it first.
 
 ## The one rule
 
