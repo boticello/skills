@@ -55,3 +55,43 @@ commit = "unverified"
 [use-railway]
 url = "UNKNOWN — verify upstream"
 commit = "unverified"
+
+[kotlin-tooling-native-build-performance]
+url = "https://github.com/Kotlin/kotlin-agent-skills"
+commit = "08d7ad0d74a9a5a548287b2bd4926180fab56cac"
+
+[kotlin-tooling-agp9-migration]
+url = "https://github.com/Kotlin/kotlin-agent-skills"
+commit = "08d7ad0d74a9a5a548287b2bd4926180fab56cac"
+
+[kotlin-tooling-immutable-collections-0-5-x-migration]
+url = "https://github.com/Kotlin/kotlin-agent-skills"
+commit = "08d7ad0d74a9a5a548287b2bd4926180fab56cac"
+
+[kotlin-tooling-cocoapods-spm-migration]
+url = "https://github.com/Kotlin/kotlin-agent-skills"
+commit = "08d7ad0d74a9a5a548287b2bd4926180fab56cac"
+
+[kotlin-backend-jpa-entity-mapping]
+url = "https://github.com/Kotlin/kotlin-agent-skills"
+commit = "08d7ad0d74a9a5a548287b2bd4926180fab56cac"
+
+[kotlin-tooling-java-to-kotlin]
+url = "https://github.com/Kotlin/kotlin-agent-skills"
+commit = "08d7ad0d74a9a5a548287b2bd4926180fab56cac"
+
+[gradle-to-kotlin-toolchain-project]
+url = "https://github.com/singleton11/kotlin-toolchain-skills"
+commit = "bf5506d78d5952e8eaa5e52b4b195b613e5b33fe"
+
+[kotlin-toolchain]
+url = "https://github.com/singleton11/kotlin-toolchain-skills"
+commit = "bf5506d78d5952e8eaa5e52b4b195b613e5b33fe"
+
+[gradle-to-kotlin-toolchain-plugin]
+url = "https://github.com/singleton11/kotlin-toolchain-skills"
+commit = "bf5506d78d5952e8eaa5e52b4b195b613e5b33fe"
+
+[kotlin-toolchain-plugin-authoring]
+url = "https://github.com/singleton11/kotlin-toolchain-skills"
+commit = "bf5506d78d5952e8eaa5e52b4b195b613e5b33fe"
