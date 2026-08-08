@@ -32,22 +32,23 @@ reference tier is the repo itself: `deps.edn`, `kotlin/src/ClojureApi.kt`,
 
 | Job | Tool | Notes |
 |---|---|---|
-| Symbol ops: definition, references, rename, hover, file symbols | clojure-lsp via the `lsp` device | Lazily spawned — first request pays startup. Cross-file navigation verified (`user.clj` → `repl.clj`). |
+| Symbol ops: definition, references, rename, hover, file symbols | clojure-lsp via the `lsp` device | Lazily spawned — first request pays startup. Cross-file definition and references work (e.g. `user.clj` → `repl.clj`). |
 | Domain questions, what-ifs, oracle checks | nREPL via `clojure_eval` | Helpers (`counts`, `verdict`, `pool`, `sample`, `overlap`, `verify-pools`, …) are in scope in `user`. |
-| Structural edits (`.clj`/`.cljc`/`.edn`) | `clojure_edit` (top-level forms), `clojure_edit_replace_sexp`, `paren_repair` | Fallbacks only — try the built-in `edit` first. Project-scoped: paths outside the repo root are rejected; worktree files need a staged copy inside the repo. |
+| Structural edits (`.clj`/`.cljc`/`.edn`) | `clojure_edit` (top-level forms), `clojure_edit_replace_sexp`, `paren_repair` | Fallbacks only — try the built-in `edit` first. Project-scoped: paths outside the repo root are rejected; stage copies of such files inside the repo. |
 | Classpath / dependency-jar inspection | `deps_list`, `deps_grep`, `deps_read` | Runs against the connected server's classpath. |
-| Code graph: callers, callees, structure | cbm `query_graph` / `search_graph` | Repo indexed; Clojure defns are `Function` nodes with `CALLS` edges — but resolution is name-level (noise like `apply`/`get`), so verify high-impact findings against source. Index removable via `delete_project`. |
+| Code graph: callers, callees, structure | cbm `query_graph` / `search_graph` | Index the repo first (`index_repository`) if it isn't; Clojure defns are `Function` nodes with `CALLS` edges — but resolution is name-level (noise like `apply`/`get`), so verify high-impact findings against source. Index removable via `delete_project`. |
 | Semantic search over Clojure text | ken `search` (hybrid) | File-level snippets only. ken has **no Clojure extractor** — `outline`/`definition`/`callers` reject `.clj`; use it for discovery, not structure. |
 | Exact strings, literals, config | `grep` / `glob` | Fallback for anything the above can't reach. |
-| Cross code + docs exploration | Morph — unavailable | `401` in this session; do not route here. |
+| Cross code + docs exploration | Morph — unavailable | `401`; do not route here until auth is fixed. |
 
-**nREPL ports.** Discovery: `list_nrepl_ports` or `.nrepl-port`. 7888 = the
-documented `clojure -M:nrepl` alias server; the port in `.nrepl-port`
-(currently 7892) is what clojure-mcp's default connection follows; 7889 = the
-datalevin spike worktree (`../alan-puzzle-datalevin-spike`). When the
-classpath matters (datalevin on it or not), pass `port` explicitly. Restart
-the server after editing `user.clj`/`repl.clj` — stale servers carry stale
-helpers and classpaths.
+**nREPL ports.** Discover, never hardcode: the documented alias server runs
+on the port fixed in `deps.edn` (`:nrepl` alias); clojure-mcp's default
+connection follows `.nrepl-port`; anything else live shows up in
+`list_nrepl_ports`. Servers, worktrees and ad-hoc ports come and go — treat
+the current set as unknown until you look. When the classpath matters
+(datalevin on it or not), pass `port` explicitly. Restart the server after
+editing `user.clj`/`repl.clj` — stale servers carry stale helpers and
+classpaths.
 
 ## REPL-first: the working method
 
@@ -99,11 +100,12 @@ helpers and classpaths.
   first eliminator IN the order, not the first in the `eliminatedBy` list. The
   wrong version survives whole-pipeline runs because it looks plausible.
 
-## Run index and datalevin (1.0.0)
+## Run index and datalevin
 
 The run index lives in the main tree: `clojure-src/src/alanpuzzle/run_index.clj`,
 store at `run-index/`, driven by `clojure -M:index -- rebuild|status|ingest`
-(the `:index` alias; ingest is an alias of status).
+(the `:index` alias; ingest is an alias of status). The gotchas below are
+version-sensitive — the pinned datalevin version lives in `deps.edn`.
 
 - `d/q` takes a DB, not a conn: `(d/q query (d/db conn) …)`.
 - `d/fulltext-datoms` returns plain vectors `[e a v]` (use `(first …)` for the
@@ -113,19 +115,17 @@ store at `run-index/`, driven by `clojure -M:index -- rebuild|status|ingest`
   entity loss). Always pass the full schema.
 - Scale: ingest ≈5 s per 50,000-cell run; E18 reconcile (3 orders) ≈375 ms;
   pairwise diffs (21 pairs × 50k cells) ≈1 s; DB ≈224 MB with fulltext.
-- Spike evidence and decisions: `spike/decision.md` in the worktree
-  `../alan-puzzle-datalevin-spike`.
 
 ## CLI quirks
 
 - `clojure -M` positionals are load-files, not main args; use `-M -m ns` to
   pass args, and note `--` arrives as a literal argument — tolerate a leading
   `--` in `-main`.
-- clojure-mcp structural tools are sandboxed to the repo root: worktree files
-  need a staged copy inside the repo, or the server's `:allowed-directories`
-  extended.
+- clojure-mcp structural tools are sandboxed to the repo root: files outside
+  it need a staged copy inside the repo, or the server's
+  `:allowed-directories` extended.
 
-## Gotchas (live-verified)
+## Gotchas
 
 - `counts` is 0-arity (`(counts)`); `verdict` is 1-arity (`(verdict 300001)`).
 - LSP servers spawn lazily — a first request may take a moment.
