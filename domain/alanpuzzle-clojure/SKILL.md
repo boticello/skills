@@ -43,6 +43,11 @@ Read the retro once — it explains why these rules exist.
    `verification.txt` E18 tables (presented / descending-power / red-blue-first),
    `stage-deltas.csv`, `sheet-summary.csv`, `book.csv` hashes, the facade pools.
    Reconcile, don't trust. A number that matches an independent aggregate is done.
+   Neither side of a reconciliation is privileged — validate the comparison harness
+   itself before blaming either side: BSD `grep` treats unescaped parens as regex
+   groups (use `grep -F` for literals), `grep -A n` context leaks into the next
+   section, and for CSV extraction use `qsv` (`qsv select <col> f.csv | qsv frequency`),
+   not awk field games.
 4. **Grep the Kotlin before reimplementing semantics:** `Criteria.kt` (`allMath`,
    `presentedOrder`), `ConstructionChecks.kt` (the E18 order definitions),
    `Verifier.kt` (`classify`). Deriving from memory is how grid-dependent orders get
