@@ -113,8 +113,6 @@ version-sensitive — the pinned datalevin version lives in `deps.edn`.
 - `d/transact!` is synchronous; `d/transact` is the async variant.
 - `create-conn` with `{}` schema on an existing DB is DESTRUCTIVE (observed
   entity loss). Always pass the full schema.
-- Scale: ingest ≈5 s per 50,000-cell run; E18 reconcile (3 orders) ≈375 ms;
-  pairwise diffs (21 pairs × 50k cells) ≈1 s; DB ≈224 MB with fulltext.
 
 ## CLI quirks
 
