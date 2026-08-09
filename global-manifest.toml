@@ -9,38 +9,25 @@
 # NOTE: adding a new skill to canonical requires adding it here too, or it
 # won't deploy globally. Run reconcile/deploy --dry-run to catch drift.
 
-# 32 skills (role-universal core)
+# 18 skills (tools, VCS, search, personal)
 skills = [
     "almanac",
     "bin-creator",
+    "backlog",
     "br",
     "cbm",
     "cheatsheets",
     "code-and-docs-search",
-    "code-review",
-    "coordination-protocol",
-    "discovery-architect",
-    "documentation-writer",
-    "execution-spine",
     "file-introspection",
     "filesearch",
-    "fs-reorg",
     "git-change-manage",
     "git-vcs",
     "jj-change-manage",
     "jj-vcs",
     "lark-crm",
-    "lead",
     "mcp-manage",
     "op-env-wrap-tool",
     "root-cause-debugger",
     "skills-manage",
-    "spike-planning",
-    "supervisor",
-    "update-docs",
-    "verify",
-    "work-unit-manage",
-    "wrap",
-    "write-design-doc",
     "zcode",
 ]
