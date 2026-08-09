@@ -134,6 +134,6 @@ version-sensitive — the pinned datalevin version lives in `deps.edn`.
 
 ## Related
 
-- `analysis/clojure-repl-retrospective.md` — the narrative behind these rules.
+- `doc://clojure-repl-retrospective` — the narrative behind these rules (resolves via the repository's document register, `documents.json`).
 - Project scope: deployed from `~/Me/repos/skills/domain/alanpuzzle-clojure/`,
   listed in `.agents/skills-manifest.toml`.

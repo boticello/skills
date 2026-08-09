@@ -88,6 +88,26 @@ A ticket carries four elements, mapped onto Backlog.md's fields:
    `backlog/completed/` in one step (or `just ticket edit <id> -s "Done"`
    then `backlog task complete <id>`). Commit the close with its evidence.
 
+## Revising a ticket (rewriting content)
+
+To rewrite an existing ticket's title, description, acceptance criteria, or
+references — a re-scope, a design change, splitting scope — use
+`backlog task edit` with the body in a file, exactly like Create:
+
+```
+just ticket edit <id> -t "New title" -d "$(cat body.md)" \
+  --acceptance-criteria "criterion one" --acceptance-criteria "…" \
+  --ref "path — why" --ref "path — why"
+```
+
+- `--acceptance-criteria` and `--ref` **replace** the full set (repeat the
+  flag per item); `-t` and `-d` set single fields.
+- The narrative of *why* the ticket changed goes as a comment alongside
+  (`just ticket edit <id> --comment "$(cat note.md)"`, or
+  `just tcomment <id> "short note"`). The body stays a clean self-contained
+  instruction; the planning history lives in the comment.
+- Do not hand-edit the task file; verify with `just tview <id>`.
+
 ## Gotchas
 
 - Use the **typed recipes** (`tlist`/`tview`/`tnew`/`tcomment`/`tclose`) for
