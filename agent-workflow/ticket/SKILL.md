@@ -2,12 +2,12 @@
 name: ticket
 description: >-
   Main-agent workflow for the project tracker (Backlog.md): decide whether
-  work needs a ticket, construct rich ticket content (title, Brief,
-  references, acceptance criteria), and delegate the mechanics to the
-  ticket-specialist task agent. Use whenever the user asks to create, revise,
-  comment on, check, or close a ticket — "create a ticket for X", "implement
-  PUZZLE-49", "what's the current ticket?", "close that task" — or when the
-  closure gate or a task's Definition of Done is mentioned.
+  work needs a ticket (including filing defects as bug tickets), construct
+  rich ticket content, and delegate the mechanics to the ticket-specialist
+  task agent. Use whenever the user asks to create, revise, comment on,
+  check, or close a ticket — "create a ticket for X", "implement PUZZLE-49",
+  "what's the current ticket?", "close that task", "file a bug" — or when
+  the closure gate or a task's Definition of Done is mentioned.
 license: MIT
 domain: project-management
 role: specialist
@@ -25,6 +25,9 @@ triggers:
   - closure gate
   - definition of done
   - DoD
+  - bug
+  - defect
+  - file a bug
 ---
 
 # Ticket workflow (alan-puzzle)
@@ -42,6 +45,9 @@ Ask: "Do I need to think about HOW to do this?"
   agent or session will pick up → create a ticket.
 - **No** — mechanical edits, quick lookups, obvious fixes → do it directly;
   a ticket is overhead.
+- **Found a defect** (broken tooling, corrupted artefact, wrong output)? File
+  **one bug ticket per defect** — report format (Observed / Reproduction /
+  Expected / Impact), never the four-element task format, never batched.
 
 Search before creating (`backlog search <term>`, or ask the specialist):
 reuse an existing ticket instead of duplicating.
@@ -59,7 +65,7 @@ source; do not re-derive it here.
 
 | Action | What you supply | Example instruction |
 |---|---|---|
-| **Create** | The full four-element content (title, Brief, refs, ACs) plus labels/priority | "Create a ticket: <title>. Description: <brief>. References: <paths + why>. Acceptance criteria: <list>. Priority High." |
+| **Create** | The full four-element content (title, Brief, refs, ACs) plus labels/priority — **bugs use the report format instead** (see `ticket-writing.md` §Bug reports) | "Create a ticket: <title>. Description: <brief>. References: <paths + why>. Acceptance criteria: <list>. Priority High." — or "File a bug: <observed / reproduction / expected / impact>" |
 | **Revise** | The id, exactly what changes (title/body/ACs/refs/labels/priority/status), and why (as a comment) | "Revise PUZZLE-12: set status In Progress, add acceptance criterion <X>; comment: <why>" |
 | **Comment** | The id and the text (with `@user` if the author matters) | "Add a comment to PUZZLE-9: <text>" |
 | **Close** | The id and the evidence — which ACs are verified and how | "Close PUZZLE-49: ACs 1–3 verified by <evidence>; write the final summary" |
