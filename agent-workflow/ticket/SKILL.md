@@ -1,15 +1,13 @@
 ---
 name: ticket
 description: >-
-  Use whenever the user asks to create, work on, review, or close a ticket or
-  task in this project — "implement PUZZLE-49", "create a ticket for X", "ticket
-  this", "what's the current ticket?", "close that task" — or whenever the
-  tracker is operated through `just ticket` / `just tlist` / `just tclose` /
-  `just current`. Also load when the closure gate, the current-ticket signal,
-  or a task's Definition of Done is mentioned. The project's ticket workflow
-  rides on Backlog.md (folder `backlog/`): "ticket" is the unit of work and
-  the workflow abstraction; Backlog.md is the implementation; `just ticket`
-  and the typed recipes are the interface.
+  Main-agent workflow for the project tracker (Backlog.md): decide whether
+  work needs a ticket, construct rich ticket content (title, Brief,
+  references, acceptance criteria), and delegate the mechanics to the
+  ticket-specialist task agent. Use whenever the user asks to create, revise,
+  comment on, check, or close a ticket — "create a ticket for X", "implement
+  PUZZLE-49", "what's the current ticket?", "close that task" — or when the
+  closure gate or a task's Definition of Done is mentioned.
 license: MIT
 domain: project-management
 role: specialist
@@ -18,23 +16,23 @@ output-format: workflow
 triggers:
   - ticket
   - tickets
-  - task
   - backlog
-  - just ticket
-  - just tlist
-  - just tclose
-  - just current
   - PUZZLE-
-  - closure gate
+  - create a ticket
+  - revise a ticket
+  - close a ticket
   - current ticket
+  - closure gate
+  - definition of done
+  - DoD
 ---
 
 # Ticket workflow (alan-puzzle)
 
-The project's tracker: tickets are the unit of work; Backlog.md is the
-implementation; `just ticket` and the typed recipes are the interface. Never
-hand-edit files under `backlog/` — they are tool-managed; all changes go
-through the CLI.
+Tickets are the unit of work; Backlog.md (folder `backlog/`) is the tracker;
+the `backlog` CLI is the only interface, operated by the **ticket-specialist**
+task agent (`.omp/agents/ticket-specialist.md`). Main agents construct ticket
+content and delegate the mechanics — they do not run the CLI themselves.
 
 ## When to create a ticket
 
@@ -45,85 +43,54 @@ Ask: "Do I need to think about HOW to do this?"
 - **No** — mechanical edits, quick lookups, obvious fixes → do it directly;
   a ticket is overhead.
 
-Search before creating (`backlog search <term>` or `just ticket list
---search <term>`): reuse an existing ticket instead of duplicating. Note
-`--search` matches task bodies — verify the id after searching.
+Search before creating (`backlog search <term>`, or ask the specialist):
+reuse an existing ticket instead of duplicating.
 
-## Ticket anatomy (content contract: `process/ticket-writing.md`)
+## Constructing a ticket (compulsory reading)
 
-A ticket carries four elements, mapped onto Backlog.md's fields:
+Creating is a construction task: you write the content, the specialist files
+it. Read **`process/ticket-writing.md` before creating or revising any
+ticket** — it is the content standard: how to structure a ticket (bug,
+feature, question), the four elements (title, Brief, references, acceptance
+criteria), language rules, and the closure gate. The standard is the single
+source; do not re-derive it here.
 
-- **Title** — noun phrase naming the deliverable, not the activity.
-- **Description** — Brief (current situation + deliverable), References
-  (paths + why), and Plan (what to achieve) as markdown.
-- **Acceptance criteria** (`--ac`) — checkable yes/no statements a third
-  party can verify without re-deriving intent. The structured field is
-  canonical — do not duplicate it as a body section.
-- **DoD defaults** — auto-added to every task (closure gate + `doc check`
-  green); leave them in place.
+## The five actions
 
-## Lifecycle
+| Action | What you supply | Example instruction |
+|---|---|---|
+| **Create** | The full four-element content (title, Brief, refs, ACs) plus labels/priority | "Create a ticket: <title>. Description: <brief>. References: <paths + why>. Acceptance criteria: <list>. Priority High." |
+| **Revise** | The id, exactly what changes (title/body/ACs/refs/labels/priority/status), and why (as a comment) | "Revise PUZZLE-12: set status In Progress, add acceptance criterion <X>; comment: <why>" |
+| **Comment** | The id and the text (with `@user` if the author matters) | "Add a comment to PUZZLE-9: <text>" |
+| **Close** | The id and the evidence — which ACs are verified and how | "Close PUZZLE-49: ACs 1–3 verified by <evidence>; write the final summary" |
+| **Check** | The question | "What's the current In Progress ticket?", "Show PUZZLE-29", "Search for <term>" |
 
-1. **Create** — `just tnew "Title"` for a bare task, or
-   `just ticket create "Title" -d "$(cat body.md)" --ac "Criterion one" -l
-   labels --priority High` for a full ticket. Multi-line values: write the
-   body to a file and pass it with `-d "$(cat file)"` — the CLI keeps
-   backticks, `$`, and quotes verbatim.
-2. **Commit at creation, solo and immediately.** A new task is a published
-   contract: visible to other agents and clones, safe from a clean/stash/
-   worktree switch. Task-file edits (status, comments, plan) ride with the
-   implementing commit; never leave a task file uncommitted across sessions.
-3. **Work one ticket at a time** — one ticket per session keeps the context
-   window reviewable. Read `backlog instructions overview` (plus the
-   creation/execution/finalization guides) before working the tracker; the
-   generated guidance is the agent-facing contract. Set status with
-   `just ticket edit <id> -s "In Progress"`; note progress with
-   `just tcomment <id> "text"`.
-4. **Current ticket** — `just current` prints the In Progress ticket(s)
-   ("No tasks found." when none). This is the render/default target signal.
-5. **Verify before close** — the DoD items: confirmed records carried into
-   maintained docs with `derived_from` back-links (closure gate), and
-   `doc check` green where applicable.
-6. **Close** — `just tclose <id>` sets Done and moves the file to
-   `backlog/completed/` in one step (or `just ticket edit <id> -s "Done"`
-   then `backlog task complete <id>`). Commit the close with its evidence.
+## Mechanics — instruct the ticket-specialist
 
-## Revising a ticket (rewriting content)
-
-To rewrite an existing ticket's title, description, acceptance criteria, or
-references — a re-scope, a design change, splitting scope — use
-`backlog task edit` with the body in a file, exactly like Create:
-
-```
-just ticket edit <id> -t "New title" -d "$(cat body.md)" \
-  --acceptance-criteria "criterion one" --acceptance-criteria "…" \
-  --ref "path — why" --ref "path — why"
-```
-
-- `--acceptance-criteria` and `--ref` **replace** the full set (repeat the
-  flag per item); `-t` and `-d` set single fields.
-- The narrative of *why* the ticket changed goes as a comment alongside
-  (`just ticket edit <id> --comment "$(cat note.md)"`, or
-  `just tcomment <id> "short note"`). The body stays a clean self-contained
-  instruction; the planning history lives in the comment.
-- Do not hand-edit the task file; verify with `just tview <id>`.
+One `task` dispatch, `agent: ticket-specialist`, with the request above. The
+specialist translates it onto the CLI, verifies every write by re-reading the
+task, and commits every change (granular). It returns the verified state
+(id, status, commits, evidence). That is the whole loop — do not run the
+`backlog` CLI yourself and do not hand-edit `backlog/` files.
 
 ## Gotchas
 
-- Use the **typed recipes** (`tlist`/`tview`/`tnew`/`tcomment`/`tclose`) for
-  multi-word values — they quote inside the recipe. The passthrough
-  `just ticket <args>` splits on spaces: `just ticket list -s "To Do"` fails;
-  escape as `-s \"To\ Do\"` or use `just tlist "To Do"`.
-- `task list` shows only `backlog/tasks/`, not `backlog/completed/` — a
-  closed ticket drops out of `list` but `task view <id>` still works.
-- Priorities/labels/statuses are accepted case-insensitively and stored
-  lowercase; ids are `PUZZLE-N`.
-- `--search` is unscoped content search (title, description, notes,
-  comments) — always verify an id by `just tview` before acting on it.
+- The CLI fails silently (exit 0 on "Task not found") — that is why the
+  specialist re-reads after every write; trust its verification, and if it
+  reports a commit failure under a sandbox, surface it.
+- Do not create tickets for questions, explanations, or mechanical edits —
+  the specialist will say so too.
+- Verify an id after searching (`--search` matches task bodies).
+- Same-task edits must serialize (last-writer-wins): one change at a time,
+  one commit.
 
 ## Related
 
-- `process/ticket-writing.md` — the content contract (four elements,
-  language rules, closure gate).
-- AGENTS.md §Process — the tracker paragraph (recipes, DoD, git policy).
-- `backlog instructions overview` — generated agent-facing guidance.
+- `process/ticket-writing.md` — the content contract (four elements, language
+  rules, closure gate).
+- `process/tracker.md` — tracker mechanics, conventions, gaps, git policy.
+- `.omp/agents/ticket-specialist.md` — the operator: its prompt carries the
+  CLI usage and process guidance.
+- AGENTS.md §Process — the tracker paragraph.
+- `backlog instructions overview` — generated agent-facing guidance (the
+  specialist reads it before lifecycle actions).

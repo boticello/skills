@@ -8,7 +8,7 @@ description: >-
   that prevent a wrong action mid-task: the CLI-only write path (never edit
   task files), DoD defaults, JSON shapes, the quoting and concurrency gotchas,
   and the dependency-cycle gap. Triggers on "backlog task", "create a ticket",
-  "what's my current ticket", "just ticket", or any task-lifecycle request.
+  "what's my current ticket", or any task-lifecycle request.
 license: MIT
 domain: project-management
 role: specialist
@@ -17,8 +17,6 @@ output-format: commands
 triggers:
   - backlog
   - backlog task
-  - just ticket
-  - just current
   - create a ticket
   - close a ticket
   - DoD
@@ -90,8 +88,6 @@ The gotchas that cause a wrong action if not internalized up front:
   `--check-ac N`, write `--final-summary`, then set the terminal status.
   `task complete` moves Done tasks to `completed/`; `task archive` is for
   non-Done tasks and refuses Done ones.
-- **`just ticket *ARGS` passthrough loses quotes** (justfile splat) — multi-word
-  values need shell-escaped quotes: `just ticket list -s \"To\ Do\"`.
 - **Milestone re-add is not idempotent** — "alias conflict" error; check
   `backlog milestone list` first.
 - **Do not edit task files** to backdate dates unless the migration record
@@ -158,3 +154,6 @@ second passes for deps/comments/closure. Key design points:
 - `coordination-protocol` / `execution-spine` — lifecycle policy this skill
   defers to.
 - `git-vcs` / `git-change-manage` — commit workflow (backlog/ is plain files).
+- alan-puzzle's `ticket` skill — the main-agent ticket workflow; the
+  project's ticket-specialist task agent uses this skill as its usage
+  reference.
