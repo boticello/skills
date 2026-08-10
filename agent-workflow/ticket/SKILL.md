@@ -85,6 +85,12 @@ have what you need to do it. Claim through the specialist (Revise: status In
 Progress + assignee, with a comment). Do not leave a ticket To Do while you
 are executing it.
 
+**Handoff.** When work is complete but held for review — or parked for any
+reason — write the review-ready summary on the ticket before stopping: what
+changed, where it lives (branch/commit), and the verification evidence. The
+reviewer reads the ticket, not the conversation. Implementation notes via the
+specialist (`--append-notes`); the same summary becomes the close evidence.
+
 ## Mechanics — instruct the ticket-specialist (writes and searches)
 
 One `task` dispatch, `agent: ticket-specialist`, with the request above. The
