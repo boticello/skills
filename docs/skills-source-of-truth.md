@@ -97,7 +97,12 @@ adapters referring to `work-unit-manage`. Other optional references include
 `verify`, `ticket`, `feature-handoff` and `nia`. These may be intentional
 project/on-demand references, but the final operating model must say whether
 active global skills may rely on unavailable helpers or whether a minimum
-operating spine is global.
+operating spine is global. A read-only audit recommends adding the four
+operating-spine skills (`coordination-protocol`, `execution-spine`,
+`supervisor`, `work-unit-manage`) and leaving the five conditional helpers
+(`ticket`, `nia`, `filing-process`, `orientate`, `troubleshoot-codex`) on-demand.
+This would make 23 global entries without claiming recursive closure; the
+recommendation remains for user review.
 
 ## Proposed operational rules
 

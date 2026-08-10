@@ -101,10 +101,21 @@ path; the deviation should be visible rather than silently inferred.
 ## Decisions still required
 
 1. Adopt or amend the proposed local-commit rule.
-2. Choose the global operating spine: the minimum candidate is
-   `lead`, `supervisor`, `coordination-protocol`, `execution-spine`, and
-   `work-unit-manage` alongside the existing Git/JJ adapters.
+2. Confirm the global operating spine. The dependency audit found nine absent
+   direct references from the current 19-entry manifest. The recommended
+   smallest operational closure is 23 entries: add
+   `coordination-protocol`, `execution-spine`, `supervisor` and
+   `work-unit-manage`; keep `ticket`, `nia`, `filing-process`, `orientate` and
+   `troubleshoot-codex` conditional/on-demand. A 22-entry variant omits
+   `supervisor`; a literal 28-entry closure is not recommended because it
+   globalises project, personal, API-backed and vendor material.
 3. Decide whether the default work context is a dedicated branch/worktree or
    whether the current branch may be used when explicitly identified.
 4. Define who may approve a local exception, merge, push, deployment or
    publication, and where that approval is recorded.
+
+Questions 1, 3 and 4 above have been answered for this work: the local
+save-point rule is adopted, a dedicated non-default branch/worktree is the
+default, and only the user approves external operations. Question 2 remains
+under review; even the recommended four-skill addition is operational rather
+than recursive, because the spine itself names stage-specific helpers.
