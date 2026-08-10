@@ -1,6 +1,12 @@
 ---
 name: file-introspection
 version: "1"
+triggers:
+  - unknown file type
+  - inspect a binary file
+  - identify file format
+  - untrusted file
+  - missing file extension
 description: Identify and analyse files of unknown, obscure, or untrusted type using exiftool, magick identify, file, magika, strings, and hexyl. Load before processing any file whose format is unclear, when extensions are missing or untrustworthy, or when metadata and binary structure must be understood before acting on a file.
 ---
 

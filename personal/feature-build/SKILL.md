@@ -34,7 +34,9 @@ This skill exists to keep feature work disciplined: understand requirements, ext
 7. Respect jj working-copy state before editing.
 8. Implement in the correct files.
 9. Add tests as part of the implementation.
-10. Use the validation ladder in `00-system/docs/governance/me-cli-validation-ladder.md` to choose the right sequence of diff inspection, syntax checks, focused unit tests, early live-query probes, integration validation, and full-suite validation.
+10. Use the consuming project's validation ladder to choose the right sequence
+    of diff inspection, syntax checks, focused unit tests, early live-query
+    probes, integration validation, and full-suite validation.
 11. If the slice required real debugging, correction of a mistaken assumption, or repair of a broken validation path, run a short self-audit before considering it complete: what failed, what category of failure it was, what should change next time, and whether the lesson belongs on the ticket, in a jot, or in maintained guidance.
 12. At the end of each stable implementation slice, write progress back to the ticket and explicitly reflect on what the slice taught.
 13. If the lesson is broader than the ticket, record a jot reflection.
@@ -73,7 +75,8 @@ Use this distinction:
 
 When implementation and reflection are finished:
 
-15. Commit the work with `Refs #<id>` in the message (see `docs/governance/ticket-commit-workflow.md`).
+15. Commit the work with `Refs #<id>` in the message, following the
+    consuming project's ticket-commit guidance.
 16. If the CLI command surface changed, rebuild and reinstall the gem:
     ```
     script/install-global --force

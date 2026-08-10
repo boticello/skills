@@ -1,6 +1,12 @@
 ---
 name: filesearch
 description: Find files anywhere in ~/Me/ — pick the right tool (mdfind, find, pdftotext, codesearch) for the question. Also covers the canonical home of every common material type. Use this skill whenever the user asks "where is X", "find me the file for Y", or "what folder holds Z". Load it before doing any non-trivial file-finding in the user's filesystem.
+triggers:
+  - find a file
+  - where is the file
+  - locate a document
+  - search the filesystem
+  - what folder holds
 alwaysAllow:
   - Bash
 requiredSources:

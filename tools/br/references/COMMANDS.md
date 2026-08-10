@@ -46,6 +46,12 @@ br reopen --actor "$ACTOR" <id> --reason "..."       # Reopen closed issue
 br delete <id>                                       # Delete issue (tombstone)
 ```
 
+### ID Convention
+
+Use the configured tracker prefix plus br's generated short code, for example
+`skills-8cj`. Do not pass `--slug`; keep the descriptive wording in the title
+so IDs remain short and easy to type.
+
 ### Create Options
 
 ```bash

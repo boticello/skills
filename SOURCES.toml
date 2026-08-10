@@ -41,6 +41,7 @@ commit = "3027f20f3181758385a1bb8c022d4041dfb4de84"
 url = "https://github.com/michalparkola/tapestry-skills"
 commit = "80e1dc56df74d1cb849ad649c7ead9756e7929bb"
 path = "article-extractor"
+
 [tapestry]
 url = "https://github.com/michalparkola/tapestry-skills"
 commit = "b134509a6f2f80b4adbfe9c71f2a23ac3bc6ab10"

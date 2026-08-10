@@ -260,5 +260,7 @@ puts c.query_one("SELECT count() FROM subscription WHERE frequency = \"yearly\" 
 - `schema/README.md` — Migration file convention and file layout
 - `ARCHITECTURE.md` — Schema Migrations section, SurrealDB gotchas
 - `AGENTS.md` — SurrealDB Schema Changes section
-- `docs/howto/shaping-a-database-ticket.md` — Pre-implementation drift check and migration shapes
-- `docs/governance/ticket-commit-workflow.md` — Git commit format for ticket-tracked work
+- The consuming project's database-ticket-shaping guidance —
+  pre-implementation drift checks and migration shapes
+- The consuming project's ticket-commit guidance — Git commit format for
+  ticket-tracked work

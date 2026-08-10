@@ -131,7 +131,8 @@ backlog search "x" --json | jq -r '.results[].task.id'
 ## Import / migration
 
 Bulk import has no built-in command; the reusable mechanism is the Ruby
-importer pattern (`scripts/import-beads-to-backlog.rb` in alan-puzzle):
+importer pattern maintained in the consuming project (the alan-puzzle project
+currently provides an example):
 read the source export (issues.jsonl) read-only, shell out to
 `backlog task create`, write a mapping CSV (resume-safe), then idempotent
 second passes for deps/comments/closure. Key design points:

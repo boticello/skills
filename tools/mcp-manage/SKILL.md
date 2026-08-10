@@ -1,6 +1,12 @@
 ---
 name: mcp-manage
 description: Add, edit, or deploy MCP servers across all agent harnesses from one canonical source. Use before hand-editing any harness's MCP config, or when adding a new MCP server.
+triggers:
+  - MCP server
+  - configure MCP
+  - add an MCP server
+  - deploy MCP
+  - MCP config
 ---
 
 # mcp-manage

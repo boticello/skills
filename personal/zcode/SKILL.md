@@ -8,6 +8,12 @@ description: >-
   comparing ZCode to opencode/Codex/Zed. Trigger on: ZCode, zcode, "ZCode
   settings", "MCP in ZCode", "ZCode won't see my tools", "import MCP",
   .zcode/config.json, ~/.zcode.
+triggers:
+  - ZCode
+  - zcode
+  - ZCode settings
+  - MCP in ZCode
+  - ZCode skills
 ---
 
 # ZCode desktop app

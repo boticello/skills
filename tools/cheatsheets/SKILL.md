@@ -1,6 +1,12 @@
 ---
 name: cheatsheets
 description: Create, update, and maintain CLI cheatsheets for the `cheat` CLI following the canonical template and style guide. Use when the user asks to author, edit, lint, or manage .cheat files in ~/Me/repos/cheatsheets/personal/.
+triggers:
+  - cheatsheet
+  - cheat sheet
+  - edit a cheatsheet
+  - .cheat file
+  - cheat CLI
 ---
 
 # Cheatsheet Authoring Skill

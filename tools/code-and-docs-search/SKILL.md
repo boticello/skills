@@ -1,137 +1,126 @@
 ---
 name: code-and-docs-search
-description: General orchestration layer for finding information — which tool answers which kind of question, across code, docs, and cross-corpus. Sits above tool-specific skills (cbm, nia). Load this in any project to pick the right tool: Ken for code natural-language and symbols, cbm for code structural/graph queries (Python+), qmd for semantic search over docs/notes, Morph for cross-corpus (code+docs) deep exploration, ugrep for Boolean/multiline patterns, Nia for anything outside the local repo.
+description: >-
+  Use whenever an agent must find code, understand an implementation, inspect
+  Git history, recover a decision, search documentation, or choose between
+  Ken, sem, cbm, qmd, Morph, ugrep, Backlog, AgentsView, and external search.
+  Routes each question to the right corpus and the cheapest trustworthy tool.
+triggers:
+  - search code
+  - code search
+  - where is this implemented
+  - how does this work
+  - git history
+  - what changed
+  - who changed
+  - what did we decide
+  - search docs
+  - tickets
+  - br
+  - backlog
+  - sem
+  - Ken
+  - cbm
+  - qmd
 ---
 
-# Code Intelligence — Tool Orchestration
+# Code and documentation search
 
-This skill is the **environment-wide** decision layer for "which tool answers
-this question?" It covers code, docs, and cross-corpus search. It sits *above*
-the tool-specific skills:
+This is the decision layer above the tool-specific skills. Its job is to ask
+the right question of the right corpus, not to reproduce every tool's command
+reference.
 
-- **cbm skill** → safe cbm workflow, intra-tool choice, verification rules
-- **cbm cheatsheet** → command shapes, Cypher snippets, option gotchas
-- **nia skill** → external (packages, docs, web) search
+## Ask these questions first
 
-Load this skill when the agent needs to find information and the right tool
-isn't obvious. For a tool's deep detail, load that tool's own skill.
+1. **Where does the answer live?** Current code, Git history, prose/docs,
+   tickets, prior agent sessions, an external corpus, or several together?
+2. **What shape is the question?** Conceptual discovery, exact symbol,
+   dependency/architecture, change/ownership/impact, or literal pattern?
+3. **Is relevance enough, or must recall be exhaustive?** Exploration can use
+   ranked retrieval; refactors, renames, policy checks and audits need an
+   exact/exhaustive pass.
+4. **What is authoritative and fresh?** Check index state where it matters,
+   then verify conclusions against source, raw Git, or the maintained record.
 
-## Principle
+## Routing table
 
-**Match the corpus first; cheapest tool that answers; paid tools sparingly.**
+| Question | Start with | Value and boundary |
+|---|---|---|
+| Where is a code concept implemented now? | Ken `search` | Hybrid semantic + lexical ranking; finds abstractions and synonyms, but is not exhaustive. |
+| Where is a named symbol or its file-level use? | Ken `definition`, `callers`, `references`, `outline` | Fast tree-sitter-grade lookup; name-resolved, not compiler/type-resolved. |
+| How did an entity evolve, who owns it, or what does a change affect? | `sem log`, `blame`, `diff`, `impact`, `context` | Entity-aware history, semantic diffs, dependants and affected tests; use raw Git as final authority. |
+| What changed very recently? | Ken `recently_changed` | Cheap chronological/path-filtered snapshot; use `sem` for serious history analysis. |
+| What calls what, where are cycles, or what are the architectural clusters? | cbm graph tools | Arbitrary multi-hop and architecture queries; load the `cbm` skill first and verify language coverage. |
+| Where does an exact pattern occur everywhere? | `rg`/ugrep (`ug`) | Exhaustive literal, Boolean, multiline, fuzzy and file-type search; preferred for safe refactors and policy audits. |
+| What do requirements, correspondence or design notes say? | qmd `query` | Local hybrid search over prose/Markdown; not a code index. |
+| Which ticket owns this, or what rationale was recorded there? | The project's tracker (`br` in this repository; Backlog in the alan-puzzle project) | Commitment and ownership record; follow the owning project's tracker workflow rather than treating a search result as current truth. |
+| What happened in an earlier agent session? | AgentsView recall/content search | Searches conversation and tool evidence; corroborate against maintained records. |
+| How do code and design documents connect end to end? | Morph `codebase_search` | Cross-corpus exploration; slower/paid, so reserve for genuine code+docs questions. |
+| How does an external package or API work? | Nia/external primary-source search, when configured | Outside-repository corpus; load the relevant external-search skill first. |
 
-The single most common routing error is asking the wrong corpus — running a
-code tool against a docs question, or vice versa. Decide code vs docs vs both
-*before* picking a tool. Then reach for the cheapest tool that answers, and
-only escalate to a paid or heavier tool (Morph) when the cheap ones genuinely
-can't answer in 2–3 calls.
+When a compiler/LSP query surface is available, prefer it for type-resolved
+references, hierarchy, diagnostics and rename safety. Ken, sem and tree-sitter
+graphs do not replace compiler semantics.
 
-## Decision Flow
+## Operating sequence
 
-**First fork: which corpus does the answer live in?** Code, docs, or both?
+1. Pick the corpus and question shape using the four questions above.
+2. Use the cheapest specialised tool that can answer it.
+3. If two or three focused calls do not resolve it, escalate: Ken → cbm for
+   relationships; qmd/Ken → Morph for cross-corpus; ranked search → ugrep for
+   completeness.
+4. Read the returned source or maintained record. Search results are leads,
+   not evidence by themselves.
+5. Before changing code, add an exhaustive exact or type-aware pass when a
+   missed reference could make the change unsafe.
+6. For historical claims, prefer `sem`'s entity perspective, then confirm the
+   decisive patch/commit with raw Git when exactness matters.
 
-```
-Agent needs to find information
-    │
-    ├─ ANSWER LIVES IN CODE ────────────────────────────────────────
-    │
-    ├─ Natural-language / conceptual question about code?
-    │   ("How does X work?", "Where is Y implemented?")
-    │       └─> Ken `search` (model2vec + BM25 hybrid)
-    │           Finds abstractions, not just implementations.
-    │
-    ├─ Exact / terse symbol lookup?
-    │   ("Where is FastAgent defined?")
-    │       └─> Ken `definition`  (1 call, no FQN needed)
-    │
-    ├─ Structural query?
-    │   ("Find all classes", "Who calls generate()?",
-    │    "What's the inheritance hierarchy?", "What code is dead?")
-    │       └─> cbm (load cbm skill first)
-    │           search_graph (label filter), query_graph (Cypher) for
-    │           callers/callees and path queries. Python only — see Language
-    │           Fit below.
-    │           NOTE: cbm `trace_path` returns empty in 0.8.1 (confirmed
-    │           empirically). Prefer `query_graph` for callers/callees — e.g.
-    │           MATCH (a)-[:CALLS]->(b {name:"fn"}) RETURN a.name.
-    │
-    ├─ Architecture overview of code?
-    │   ("What are the main components and how do they cluster?")
-    │       └─> cbm `get_architecture`
-    │           Leiden community detection. ~17–60 KB response — reserve for
-    │           genuine overview queries.
-    │
-    ├─ ANSWER LIVES IN DOCS / NOTES / KNOWLEDGE BASES ──────────────
-    │
-    ├─ Semantic question about design docs, plans, decisions, notes?
-    │   ("What did we decide about X?", "How is Y meant to work per the design?")
-    │       └─> qmd `query` (hybrid BM25 + vector + rerank, all local)
-    │           Markdown/prose corpus only — NOT code. Index collections with
-    │           `qmd collection add <path> --name X; qmd update; qmd embed`.
-    │           Per-collection context (`qmd context add`) is cheap and helps.
-    │           `qmd search` = BM25 only; `vsearch` = vector; `query` = best.
-    │
-    ├─ ANSWER SPANS CODE AND DOCS ──────────────────────────────────
-    │
-    ├─ Cross-cutting, end-to-end question?
-    │   ("Trace auth from entry point through to the design rationale",
-    │    "How do plugins register — code and the spec?")
-    │       └─> Morph `codebase_search` (paid, ~30s)
-    │           Sub-agent reads files autonomously across code AND docs — the
-    │           only tool that spans both. Reserve for genuine cross-corpus
-    │           questions; for single-corpus the specialised tool is faster
-    │           and free. One or two per session.
-    │
-    ├─ EITHER CORPUS / UTILITY ─────────────────────────────────────
-    │
-    ├─ Git history / recent changes?
-    │       └─> Ken `recently_changed`
-    │           (cbm `detect_changes` is broken — see `cheat cbm`.)
-    │
-    ├─ Raw text grep / advanced patterns?
-    │       ├─ Simple string → built-in `grep` or cbm `search_code`
-    │       └─ Boolean, multi-line, fuzzy, file-type → ugrep (`ug`)
-    │
-    └─ Anything outside the local repo?
-        (third-party package source, framework docs, API references)
-            └─> Nia skill (load it first; check existing sources before indexing)
-```
+## Tool-specific guardrails
 
-## Quick Reference
+### Ken
 
-| What you want | Primary tool | Fallback |
-|---------------|--------------|----------|
-| **CODE — conceptual** | Ken `search` | cbm `search_graph` (BM25; weaker) |
-| **CODE — symbol lookup** | Ken `definition` | cbm `get_code_snippet` (2 calls if ambiguous) |
-| **CODE — callers (file-level)** | Ken `callers` | cbm `query_graph` (Cypher CALLS) |
-| **CODE — callers/callees (method-level)** | cbm `query_graph` (Cypher) | — |
-| ⚠️ `trace_path` | **broken in cbm 0.8.1** (returns empty) | use `query_graph` instead |
-| Find path A→B through call graph | cbm `query_graph` (Cypher) | — |
-| Find all classes / decorators / routes | cbm `search_graph(label=...)` | — |
-| Dead-code analysis | cbm `query_graph` (Cypher) | — |
-| **CODE — architecture overview** | cbm `get_architecture` | — (unique) |
-| Schema discovery | cbm `get_graph_schema` | — (unique) |
-| **DOCS — semantic search over docs/notes** | qmd `query` | qmd `vsearch` (no rerank); `grep` (literal only) |
-| **CROSS-CORPUS — code + docs together** | Morph `codebase_search` | — (unique; paid) |
-| Raw grep (simple) | built-in `grep` or cbm `search_code` | ugrep |
-| Raw grep (Boolean/multiline/fuzzy) | ugrep | — |
-| Recent git changes | Ken `recently_changed` | — (cbm `detect_changes` broken) |
-| External packages / docs / web | Nia skill | — |
+- Primary for natural-language current-code discovery and terse symbol lookup.
+- Check `status` if index freshness or language coverage is material.
+- Use `find_related` after a good result to locate similar implementations.
+- Do not treat ranked results as exhaustive.
 
-## Language Fit (read before relying on cbm structure)
+### sem
 
-cbm's structural tools (trace_path, Cypher CALLS queries) depend on tree-sitter
-extraction, which is **language-specific**. Verify before relying on them:
+- Primary for semantic diffs, entity evolution, entity-level blame, impact,
+  affected tests, hotspots and co-change patterns.
+- `sem diff --no-cosmetics` is the cleanest first view of a noisy change;
+  verbose targeted diffs recover exact entity content.
+- `sem log <entity> --file <path>` disambiguates same-named entities.
+- `sem impact` is a focused dependency/test-impact answer; use cbm when the
+  question needs arbitrary graph traversal or architectural clustering.
+- Entity extraction is structural, not type-resolved. Git remains the record
+  of the exact patch.
 
-| Language | Call graph | Recommendation |
-|----------|-----------|----------------|
-| **Python** | ✅ works (30K+ CALLS edges in tests) | Primary structural tool |
-| **C** | ❌ 0 CALLS edges | Use Ken for structural; cbm search/architecture still usable |
-| **Go, Rust, TS, Java, Kotlin, etc.** | Untested | Try cbm, then check `get_graph_schema` — confirm CALLS edge count > 0 before trusting call tracing |
+### cbm
 
-**Before any structural query: index the project with cbm first**
-(`index_repository`). Unlike Ken, cbm does not auto-index.
+- Index the repository before structural queries and load the `cbm` skill.
+- Check graph schema and CALLS-edge coverage before trusting a language.
+- In cbm 0.8.1, `trace_path` can return empty; prefer Cypher `query_graph`
+  for caller/callee and path queries.
 
-For cbm operating discipline, **load the cbm skill**. For exact command shapes,
-Cypher snippets, and option reminders, use `cheat cbm`. This skill intentionally
-does not duplicate that detail because copied tool references drift.
+### qmd and Morph
+
+- Use qmd `query` for docs; `search` is lexical-only and `vsearch` omits the
+  reranker.
+- Use Morph only when the answer genuinely spans code and prose or cheaper
+  specialised tools have failed in a few calls.
+
+### Exact search
+
+- Use `rg` for ordinary exhaustive literals and ugrep for Boolean, multiline,
+  fuzzy, archive or file-type-aware queries.
+- Cross-language runtime boundaries—subprocesses, generated artefacts,
+  reflection and JVM interop—often escape static indexes. Verify these seams
+  from entry points, configuration and runtime evidence.
+
+## Related
+
+- `cbm` skill and `cheat cbm` — graph workflow and command shapes
+- `nia` skill — external packages, documentation and web corpora
+- `process/command-recipes.md` in projects that maintain local invocation notes

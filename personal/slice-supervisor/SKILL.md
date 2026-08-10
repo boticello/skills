@@ -16,7 +16,8 @@ metadata:
 
 ## Skill location
 
-This skill lives at `~/Me/00-system/agents/skills/slice-supervisor/`. All file references below are relative to that directory unless stated otherwise.
+This skill's canonical folder is `personal/slice-supervisor/`. All file
+references below are relative to that directory unless stated otherwise.
 
 Prompt templates: `~/Me/00-system/agents/skills/slice-supervisor/prompts/`
 Retro templates: `~/Me/00-system/agents/skills/slice-retro/templates/`
@@ -314,7 +315,7 @@ To include the Reflection section: copy the `## Reflection` paragraph from the p
 | Role | Skill | Model | Connection | Thinking | Permission | Prompt template |
 |------|-------|-------|------------|----------|------------|----------------|
 | **Supervisor** | `@slice-supervisor`, `@br` | `pi/gpt-5.5` | `chatgpt-plus` | medium | allow-all | `prompts/supervisor-prompt.md` |
-| Discovery | `@discovery-architect` | `pi/glm-5.1` | `pi-api-key` | medium | allow-all | `prompts/discovery-prompt.md` |
+| Discovery | `@discovery-architect` | `pi/glm-5.1` | `pi-api-key` | medium | allow-all | `../../planning/discovery-architect/prompts/discovery-prompt.md` |
 | Planner | `@go-slice-planner` | `pi/glm-5.1` | `pi-api-key` | high | allow-all | `prompts/planner-prompt.md` |
 | Implementer | `@go-slice-implementer` | `pi/glm-5.1` | `pi-api-key` | low | allow-all | `prompts/implementer-prompt.md` |
 | Reviewer | `@go-slice-reviewer` | `pi/glm-5.1` | `pi-api-key` | high | allow-all | `prompts/reviewer-prompt.md` |

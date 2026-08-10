@@ -161,7 +161,9 @@ jj-agent-commit-interactive "[FEAT] Added input validation"
 jj-agent-wip "working on auth flow"
 ```
 
-**Note**: Functions are automatically available after shell profile setup. See `docs/jj-agent-setup.md` for one-time configuration.
+**Note**: Functions are automatically available after the owning harness's
+shell profile setup. For current Jujutsu change boundaries and recovery, use
+the `jj-change-manage` and `jj-vcs` skills; setup details remain harness-local.
 
 ### Managing Implementation Flow
 

@@ -1,6 +1,12 @@
 ---
 name: cbm
 description: Use after the code-and-docs-search router has selected codebase-memory-mcp. Defines the minimal safe cbm workflow, tool-specific operating rules, and verification checks; use the `cbm` cheatsheet for command shapes, Cypher snippets, and option gotchas.
+triggers:
+  - codebase memory
+  - codebase-memory-mcp
+  - search graph
+  - query graph
+  - trace path
 ---
 
 # codebase-memory-mcp

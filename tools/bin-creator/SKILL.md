@@ -1,6 +1,12 @@
 ---
 name: bin-creator
 description: Scaffold a new standalone CLI tool correctly — author the source in ~/Me/OS/scripts/bin/ (the canonical home for authored tools), make it executable, symlink it into ~/.local/bin/, and pick the right language and naming pattern. Use whenever the user asks to create, add, or write a new CLI script, command, or bin tool. Prevents the "written directly to ~/.local/bin" mistake that loses source to a gitignored junction.
+triggers:
+  - create CLI
+  - new command
+  - bin tool
+  - write a script
+  - standalone CLI
 ---
 
 # bin-creator — scaffold a standalone CLI tool

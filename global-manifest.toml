@@ -9,7 +9,7 @@
 # NOTE: adding a new skill to canonical requires adding it here too, or it
 # won't deploy globally. Run reconcile/deploy --dry-run to catch drift.
 
-# 18 skills (tools, VCS, search, personal)
+# 19 skills (tools, VCS, search, personal)
 skills = [
     "almanac",
     "bin-creator",

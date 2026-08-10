@@ -38,7 +38,8 @@ metadata:
 - Never introduce new features, files, or functionality without explicit permission
 - If a task dependency is discovered, flag it but don't pursue it automatically
 - When uncertain about boundaries, ask rather than assume
-- Make **atomic commits** - each commit should represent a single logical change (see [Jujutsu Agent Workflow](jujutsu_agent_workflow.md#atomic-commit-guidelines))
+- Make **atomic commits** - each commit should represent a single logical
+  change; use `jj-change-manage` for current Jujutsu change boundaries.
 - Separate implementation steps into distinct commits that can be reviewed individually
 
 ### 3. Task Completion

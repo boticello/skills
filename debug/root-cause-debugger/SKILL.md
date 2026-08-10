@@ -4,6 +4,11 @@ description: >
   Investigate a persistent, hard-to-understand code bug using systematic
   root cause analysis. Use when a bug resists obvious fixes or repeated
   attempts have failed to resolve it.
+triggers:
+  - root cause
+  - persistent bug
+  - hard-to-understand bug
+  - repeated debugging failure
 ---
 
 ## Overview

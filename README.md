@@ -26,15 +26,22 @@ Edit a skill, then deploy:
 
 # Preview what would change without writing
 ./deploy/skills-deploy deploy --dry-run
+
+# Compare managed targets by name and content (read-only)
+./deploy/skills-deploy audit
+
+# Check canonical skill structure, metadata and references (read-only)
+./deploy/skills-deploy lint
 ```
 
 Global targets (never hand-edit — these are generated):
 - `~/.agents/skills/` — ZCode, Zed, Warp, Memo, opencode-CLI
 - `~/.codex/skills/`  — Codex (`.system/` built-ins and plugin symlinks skipped)
 
-The global set is defined by `global-manifest.toml` (currently lists all
-skills as a baseline; to be curated down — see ticket `skills-2gs`). For
-project-scoped deployment, see [Scoping](#scoping-global-vs-project-skills).
+The global set is defined by `global-manifest.toml`; it is a curated selection,
+not a list of every skill in this repository. For project-scoped deployment,
+see [Scoping](#scoping-global-vs-project-skills). The complete target-boundary
+model is in [`docs/skills-source-of-truth.md`](docs/skills-source-of-truth.md).
 
 Re-running `deploy` with no changes touches nothing.
 
@@ -73,23 +80,26 @@ afterward to make the target a clean mirror.
 
 ## What's here
 
-73 skills across 13 categories:
+78 authored skills across 12 categories, plus 21 locally vendored skills at
+the 2026-08-10 inventory. The directory tree and `skills-deploy list` are the
+authoritative inventory; this summary is intentionally count-based so it does
+not become a second registry.
 
 | Category | Skills |
 |----------|--------|
-| **agent-workflow** | agent-commit-workflow, agent-implementation-strategy, agent-task-boundaries, agent-vcs-workflow-with-jj, supervisor |
-| **analysis** | file-introspection |
-| **debug** | root-cause-debugger |
-| **domain** | pharmaceutical-definition-creator, ruby-code-analysis |
-| **go-slice** | go-slice-implementer, go-slice-planner, go-slice-reviewer, slice-retro |
-| **knowledge-management** | documentation-writer, typst |
-| **languages** | clojure, fsharp, nushell, ruby |
-| **personal** | change-manage, concept-boundary-test, concept-layer-synthesis, feature-build, filing-process, jot-capture, lark-crm, location-manage, orientate, project-manage, shopping-management, slice-supervisor, source-management, subscription-management, system-self-care, zcode |
-| **planning** | discovery-architect, feature-handoff, orchestration, plan, spike-planning, update-docs, wrap, write-design-doc |
-| **review** | code-review, remind-management, retro, verify |
-| **tools** | almanac, br, cbm, cheatsheets, database-migration, fs-reorg, tool-eval, troubleshoot-codex |
-| **vcs** | git-change-manage, git-vcs, jj-change-manage, jj-vcs, work-unit-manage |
-| **vendor/** (gitignored) | article-extractor, csv-data-summarizer, last30days, logseq-markdown, nia, omnigraph, ship-learn-next, tapestry, total-recall, use-railway, youtube-transcript |
+| **agent-workflow** | 10 |
+| **analysis** | 1 |
+| **debug** | 1 |
+| **domain** | 4 |
+| **go-slice** | 4 |
+| **knowledge-management** | 5 |
+| **languages** | 4 |
+| **personal** | 17 |
+| **planning** | 7 |
+| **review** | 4 |
+| **tools** | 16 |
+| **vcs** | 5 |
+| **vendor/** (gitignored) | 21 |
 
 ## Skill format
 

@@ -1,6 +1,12 @@
 ---
 name: almanac
 description: Manage CodeAlmanac wikis — build, ingest, capture, garden, search, and monitor background jobs. Use when the user wants to create or maintain an Almanac wiki, ingest external documents, capture agent transcripts, or query wiki contents.
+triggers:
+  - almanac
+  - CodeAlmanac
+  - almanac wiki
+  - ingest documents
+  - garden wiki
 ---
 
 # Almanac Wiki Management

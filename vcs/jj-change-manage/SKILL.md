@@ -1,6 +1,12 @@
 ---
 name: jj-change-manage
 description: Manage a coherent unit of work in Jujutsu by classifying the current working-copy change correctly, deciding when to reuse or create a new change, and closing work cleanly.
+triggers:
+  - Jujutsu work unit
+  - jj change
+  - jj workspace
+  - manage a jj change
+  - Jujutsu workflow
 ---
 
 # jj-change-manage
@@ -12,8 +18,8 @@ Use this skill whenever work happens in a `jj`-managed repository and the curren
 This is not the generic `jj` command-surface skill.
 
 Use:
-- [`work-unit-manage`](/Users/bear/Me/00-system/agents/skills/work-unit-manage/SKILL.md) for the abstract lifecycle of a work unit
-- [`jj-vcs`](/Users/bear/Me/00-system/agents/skills/jj-vcs/SKILL.md) for safe `jj` command usage and mental models
+- `work-unit-manage` for the abstract lifecycle of a work unit
+- `jj-vcs` for safe `jj` command usage and mental models
 
 This skill adds the concrete `jj` workflow:
 - how to classify the current working-copy change
@@ -30,7 +36,7 @@ Agents must classify the current change correctly before editing.
 
 ## Core mental model
 
-- The generic `jj` rules come from [`jj-vcs`](/Users/bear/Me/00-system/agents/skills/jj-vcs/SKILL.md).
+- The generic `jj` rules come from `jj-vcs`.
 - In `jj`, the working copy is already attached to a change.
 - A finished change may still be the current working-copy change until the next work unit is created.
 - Modified files alone do not tell you whether the current change is the right place for the requested work.

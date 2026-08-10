@@ -1,6 +1,12 @@
 ---
 name: op-env-wrap-tool
 description: Wire a freshly-installed tool that consumes a 1Password-backed API key into the op-env secret-bearing wrapper pattern. Use when a user says "wrap X with op-env", "configure a new tool with a 1Password key", "I just installed X and need its API key wired up", or otherwise needs a new tool's secret key injected via op-env exec. Triggers on the combination of a new tool install + a 1Password-backed credential; not for tools that don't consume secrets, and not for the "I have a key in 1Password but no tool" case.
+triggers:
+  - op-env
+  - wrap with secrets
+  - 1Password API key
+  - secret-bearing wrapper
+  - inject an API key
 ---
 
 # op-env-wrap-tool

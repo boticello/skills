@@ -26,7 +26,7 @@ Use the [`br`](tools/br) issue tracker's audit surface (`br ready`, `br blocked`
 - backlog hygiene
 - ticket-state diagnosis
 
-Use [`system-self-care`](/Users/bear/Me/00-system/agents/skills/system-self-care/SKILL.md) when the job is maintenance of the governance memory system itself.
+Use `system-self-care` when the job is maintenance of the governance memory system itself.
 
 Use `orientate` when the orientation question is larger:
 - where are we in this domain?
@@ -87,7 +87,7 @@ An orientation pass may focus on one or more of:
 - Use `me jot` for reflections that should survive beyond the session.
 - Use ticket notes for orientation scope, major findings, and chosen follow-up when the pass is part of an auditable workstream.
 - If the task is only ticket audit or backlog hygiene, use [`br`](tools/br) audit commands (`br ready`, `br stale`, `br lint`) instead of widening into a full `orientate`.
-- If the task is about tending drift, boundaries, and corpus health inside the governance memory system, use [`system-self-care`](/Users/bear/Me/00-system/agents/skills/system-self-care/SKILL.md).
+- If the task is about tending drift, boundaries, and corpus health inside the governance memory system, use `system-self-care`.
 
 ## Good patterns
 
