@@ -36,11 +36,11 @@ Tickets are the unit of work; Backlog.md (folder `backlog/`) is the tracker;
 the `backlog` CLI is the only interface. **Reads and writes have different
 owners.** Main agents run read-only lookups (`backlog task view <id>` /
 `backlog show <id>`) directly — nothing is committed and the CLI is safe to
-read from. Every *write* — create, revise, comment, close, claim — and every
-*search* is delegated to the **ticket-specialist** task agent
+read from. Every *Backlog write* — create, revise, comment, close, claim —
+and every *search* is delegated to the **ticket-specialist** task agent
 (`.omp/agents/ticket-specialist.md`): searches because the specialist carries
 the index-staleness guard, writes because each must be verified by re-reading
-and committed.
+and committed as its own exact tracker-record change.
 
 ## When to create a ticket
 
@@ -95,10 +95,21 @@ specialist (`--append-notes`); the same summary becomes the close evidence.
 
 One `task` dispatch, `agent: ticket-specialist`, with the request above. The
 specialist translates it onto the CLI, verifies every write by re-reading the
-task, and commits every change (granular). It returns the verified state
-(id, status, commits, evidence). That is the write loop — the specialist owns
-all writes and searches. Reads (`view`/`show`) need no specialist: run them
-directly, and never hand-edit `backlog/` files.
+task, and commits only the exact Backlog record path or paths it changed. It
+returns the verified state (id, status, commits, evidence). That is the
+tracker write loop — the specialist owns all Backlog writes and searches.
+Reads (`view`/`show`) need no specialist: run them directly, and never
+hand-edit `backlog/` files.
+
+## Git handoff
+
+The ticket-specialist does not commit implementation, documentation,
+configuration, generated output, branches, or worktrees. When resolving a
+ticket also needs one of those Git mutations, give the ticket-specialist the
+exact paths, requested commit message, and branch context. It delegates that
+operation to the project's git-specialist and reports the verified result.
+Tracker-record and non-tracker Git mutations must be serial; do not ask the
+two specialists to mutate one working copy concurrently.
 
 ## Gotchas
 
