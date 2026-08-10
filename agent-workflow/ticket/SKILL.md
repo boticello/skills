@@ -33,9 +33,14 @@ triggers:
 # Ticket workflow (alan-puzzle)
 
 Tickets are the unit of work; Backlog.md (folder `backlog/`) is the tracker;
-the `backlog` CLI is the only interface, operated by the **ticket-specialist**
-task agent (`.omp/agents/ticket-specialist.md`). Main agents construct ticket
-content and delegate the mechanics — they do not run the CLI themselves.
+the `backlog` CLI is the only interface. **Reads and writes have different
+owners.** Main agents run read-only lookups (`backlog task view <id>` /
+`backlog show <id>`) directly — nothing is committed and the CLI is safe to
+read from. Every *write* — create, revise, comment, close, claim — and every
+*search* is delegated to the **ticket-specialist** task agent
+(`.omp/agents/ticket-specialist.md`): searches because the specialist carries
+the index-staleness guard, writes because each must be verified by re-reading
+and committed.
 
 ## When to create a ticket
 
@@ -69,15 +74,25 @@ source; do not re-derive it here.
 | **Revise** | The id, exactly what changes (title/body/ACs/refs/labels/priority/status), and why (as a comment) | "Revise PUZZLE-12: set status In Progress, add acceptance criterion <X>; comment: <why>" |
 | **Comment** | The id and the text (with `@user` if the author matters) | "Add a comment to PUZZLE-9: <text>" |
 | **Close** | The id and the evidence — which ACs are verified and how | "Close PUZZLE-49: ACs 1–3 verified by <evidence>; write the final summary" |
-| **Check** | The question | "What's the current In Progress ticket?", "Show PUZZLE-29", "Search for <term>" |
+| **Claim** | The id, at the moment execution starts | "Claim PUZZLE-33: status In Progress, assign to @bear; comment: <why>" |
+| **Check — show/view** | Nothing — run it yourself | "Show PUZZLE-29" → `backlog task view PUZZLE-29` directly; no specialist |
+| **Check — search** | The query | "Search for <term>", "What's the current In Progress ticket?" → specialist (index-staleness guard) |
 
-## Mechanics — instruct the ticket-specialist
+**Claiming.** Investigating a ticket — reading it, researching, evaluating
+whether it is worth doing — never changes its status. *Claiming* is the moment
+you commit to executing: the ticket can be done, it should be done, and you
+have what you need to do it. Claim through the specialist (Revise: status In
+Progress + assignee, with a comment). Do not leave a ticket To Do while you
+are executing it.
+
+## Mechanics — instruct the ticket-specialist (writes and searches)
 
 One `task` dispatch, `agent: ticket-specialist`, with the request above. The
 specialist translates it onto the CLI, verifies every write by re-reading the
 task, and commits every change (granular). It returns the verified state
-(id, status, commits, evidence). That is the whole loop — do not run the
-`backlog` CLI yourself and do not hand-edit `backlog/` files.
+(id, status, commits, evidence). That is the write loop — the specialist owns
+all writes and searches. Reads (`view`/`show`) need no specialist: run them
+directly, and never hand-edit `backlog/` files.
 
 ## Gotchas
 
