@@ -90,6 +90,18 @@ global_targets() {
     fi
 }
 
+# Resolve target directories for a scope. Global targets honour the optional
+# SKILLS_TARGETS override; project scopes always use the project's two harness
+# directories.
+scope_target_dirs() {
+    local mode="$1" root="$2"
+    if [[ "$mode" == "global" ]]; then
+        global_targets
+    else
+        scope_targets "$root"
+    fi
+}
+
 # Read the global manifest: list of canonical skill names that ship by default.
 # Falls back to ALL canonical skills if the manifest is missing or has no
 # `skills = [...]` list (so behaviour is "everything global" until curated).
@@ -393,7 +405,7 @@ cmd_deploy() {
         done < <(target_real_skill_names "$target")
 
         echo
-    done < <(scope_targets "$scope_root")
+    done < <(scope_target_dirs "$mode" "$scope_root")
 
     echo "$(cyan 'summary'): ${adds} added, ${updates} updated, ${unchanged} unchanged, ${removes} removed, ${skipped_allow} allowlisted, ${skipped_link} symlink-skipped"
 }
@@ -495,7 +507,7 @@ cmd_reconcile() {
             [[ -L "$target/$name" ]] && continue                # symlink (plugin-managed)
             strays+=("$name|$target")
         done < <(target_real_skill_names "$target")
-    done < <(scope_targets "$scope_root")
+    done < <(scope_target_dirs "$mode" "$scope_root")
 
     if [[ ${#strays[@]} -eq 0 ]]; then
         echo "$(green 'no drift'): no orphan skills detected in $mode scope"
@@ -522,7 +534,7 @@ cmd_reconcile() {
             target=""
             while IFS= read -r t; do
                 [[ -f "$t/$sname/SKILL.md" ]] && target="$t/$sname" && break
-            done < <(scope_targets "$scope_root")
+            done < <(scope_target_dirs "$mode" "$scope_root")
             if [[ -z "$target" ]]; then
                 echo "  $(red 'error    ') $sname — SKILL.md not found in any target" >&2
                 continue
@@ -547,6 +559,456 @@ cmd_reconcile() {
         else
             echo "$(dim '  ./deploy/skills-deploy deploy')"
         fi
+    fi
+}
+
+# ── Subcommand: audit ─────────────────────────────────────────────────────
+# Read-only comparison of the resolved canonical set with each target. Unlike
+# reconcile, this checks content as well as names and never gathers or removes
+# anything. A non-zero result means at least one target differs from the
+# resolved set.
+
+cmd_audit() {
+    local dest="" mode="global" scope_root="$HOME" manifest_file=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dest)   dest="$2"; shift 2 ;;
+            --dest=*) dest="${1#*=}"; shift ;;
+            *) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
+        esac
+    done
+
+    if [[ -n "$dest" ]]; then
+        [[ "$dest" != /* ]] && dest="$PWD/$dest"
+        [[ -d "$dest" ]] || { echo "$(red 'error'): --dest project does not exist: $dest" >&2; return 1; }
+        mode="project"
+        scope_root="$dest"
+        manifest_file="$dest/$PROJECT_MANIFEST_REL"
+    fi
+
+    local resolved
+    resolved="$(resolve_skill_set "$mode" "$manifest_file")"
+    [[ -n "$resolved" ]] || { echo "$(red 'error'): resolved skill set is empty for $mode scope" >&2; return 1; }
+
+    echo "$(cyan 'audit') [$mode]: content and name comparison"
+    [[ "$mode" == "project" ]] && echo "  $(dim "project: $scope_root")"
+
+    # Canonical skills outside the global manifest are not necessarily drift;
+    # they may be deliberately project-scoped. Report them as an inventory
+    # reminder rather than failing the target comparison.
+    if [[ "$mode" == "global" ]]; then
+        local unmanaged
+        unmanaged="$(comm -23 \
+            <(canonical_skill_names | sort -u) \
+            <(global_manifest_skills) 2>/dev/null)"
+        if [[ -n "$unmanaged" ]]; then
+            echo "$(yellow 'unmanaged canonical skills') (not in global-manifest.toml):"
+            echo "$unmanaged" | sed 's/^/  /'
+        fi
+    fi
+
+    local drift=0 target name src dest_path diff
+    while IFS= read -r target; do
+        [[ -n "$target" ]] || continue
+        echo
+        echo "$(cyan 'target'): $target"
+        if [[ ! -d "$target" ]]; then
+            echo "  $(red 'missing-target') target directory does not exist"
+            drift=1
+            continue
+        fi
+
+        while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            src="$(canonical_source_for "$name")"
+            dest_path="$target/$name"
+            if [[ -L "$dest_path" ]]; then
+                echo "  $(dim 'skip-link ') $name"
+                continue
+            fi
+            if [[ ! -e "$dest_path" ]]; then
+                echo "  $(red 'missing   ') $name"
+                drift=1
+                continue
+            fi
+            # Audit content and names, not filesystem ownership or timestamps.
+            # --checksum catches content drift that preserves size and mtime;
+            # name-only output avoids treating timestamp metadata as content.
+            diff="$(rsync -rL --checksum --delete --dry-run --out-format='%n' \
+                        "${STRIP_EXCLUDES[@]}" "$src/" "$dest_path/" || true)"
+            if [[ -n "$diff" ]]; then
+                echo "  $(yellow 'changed   ') $name"
+                echo "$diff" | sed 's/^/      /'
+                drift=1
+            else
+                echo "  $(dim 'unchanged ') $name"
+            fi
+        done <<< "$resolved"
+
+        while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            grep -qxF "$name" <<< "$resolved" && continue
+            is_allowlisted "$name" && continue
+            echo "  $(red 'extra     ') $name"
+            drift=1
+        done < <(target_real_skill_names "$target")
+    done < <(scope_target_dirs "$mode" "$scope_root")
+
+    echo
+    if [[ $drift -eq 0 ]]; then
+        echo "$(green 'audit clean'): all resolved targets match canonical content"
+        return 0
+    fi
+    echo "$(red 'audit differences found'): review before deploying"
+    return 1
+}
+
+# ── Subcommand: lint ───────────────────────────────────────────────────────
+# Read-only structural and editorial checks for canonical skills. Default mode
+# reports warnings without blocking; --strict turns warnings into a failure so
+# release checks can opt into a quality gate without making ordinary inventory
+# work noisy or brittle.
+
+cmd_lint() {
+    local strict=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --strict) strict=1; shift ;;
+            *) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
+        esac
+    done
+
+    python3 - "$REPO_ROOT" "$GLOBAL_MANIFEST" "$strict" <<'PY'
+from pathlib import Path
+import re
+import sys
+import tomllib
+
+root = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+strict = sys.argv[3] == "1"
+skip = {".git", ".skillkit", "deploy", "vendor"}
+
+sources = {}
+for category in sorted(root.iterdir()):
+    if not category.is_dir() or category.name.startswith(".") or category.name in skip:
+        continue
+    for skill in sorted(category.iterdir()):
+        if skill.is_dir() and (skill / "SKILL.md").is_file():
+            sources.setdefault(skill.name, (skill, "authored"))
+vendor = root / "vendor"
+if vendor.is_dir():
+    for skill in sorted(vendor.iterdir()):
+        if skill.is_dir() and (skill / "SKILL.md").is_file():
+            if skill.name in sources:
+                print(f"ERROR duplicate canonical skill name: {skill.name}")
+            else:
+                sources[skill.name] = (skill, "vendor")
+
+errors = []
+warnings = []
+metadata_errors = []
+long_skills = []
+missing_triggers = []
+missing_refs = []
+old_refs = []
+
+for name, (skill, kind) in sorted(sources.items()):
+    path = skill / "SKILL.md"
+    text = path.read_text(errors="replace")
+    rel = str(path.relative_to(root))
+    lines = text.splitlines()
+    if not text.startswith("---"):
+        errors.append(f"{rel}: missing YAML frontmatter")
+        front = ""
+    else:
+        parts = text.split("---", 2)
+        front = parts[1] if len(parts) == 3 else ""
+        if len(parts) != 3:
+            errors.append(f"{rel}: unterminated YAML frontmatter")
+
+    name_match = re.search(r"(?m)^name:\s*(.+?)\s*$", front)
+    if not name_match:
+        errors.append(f"{rel}: missing frontmatter name")
+    else:
+        declared = name_match.group(1).strip().strip(" \"'")
+        if declared != name:
+            metadata_errors.append((name, f"{rel}: frontmatter name {declared!r} does not match directory {name!r}"))
+
+    description_match = re.search(r"(?m)^description:\s*(.*)$", front)
+    if not description_match:
+        errors.append(f"{rel}: missing frontmatter description")
+    elif not description_match.group(1).strip():
+        # A folded or literal YAML block may put its value on following lines.
+        line_no = front[:description_match.start()].count("\n")
+        following = front.splitlines()[line_no + 1:]
+        if not any(line.startswith((" ", "\t")) and line.strip() for line in following):
+            errors.append(f"{rel}: empty frontmatter description")
+
+    if len(lines) > 200:
+        long_skills.append((name, f"{rel} ({len(lines)} lines)"))
+    if not re.search(r"(?m)^triggers:\s*", front):
+        missing_triggers.append((name, rel))
+
+    if "/Users/bear/Me/00-system/agents/skills" in text:
+        old_refs.append(rel)
+
+    markdown_refs = set(re.findall(r"\[[^]]+\]\(([^)]+)\)", text))
+    raw_refs = set(re.findall(r"(?<![A-Za-z0-9_./-])((?:references|scripts|docs|assets|templates|prompts)/[A-Za-z0-9_./-]+)", text))
+    for ref in sorted(markdown_refs | raw_refs):
+        ref = ref.split("#", 1)[0].strip()
+        if not ref or ref.startswith(("http://", "https://", "mailto:", "#", "<")):
+            continue
+        if any(token in ref for token in ("...", "<", ">", "[[", "x.md", "foo.md")):
+            continue
+        if ref.startswith("/") or ref.startswith("~") or ref.startswith("$"):
+            continue
+        # Only treat a raw prose token as a path when it has a path-like
+        # shape. Markdown links are more explicit, but bare words such as
+        # "url" and "docs/help" are common prose and not file references.
+        if ref in raw_refs and ref not in markdown_refs:
+            if not (Path(ref).suffix or ref.startswith("../") or ref.endswith("/")):
+                continue
+        if ref in markdown_refs and not (Path(ref).suffix or "/" in ref or ref.startswith(("./", "../"))):
+            continue
+        if ref.startswith("tools/") and not Path(ref).suffix:
+            continue
+        if ref not in markdown_refs and not Path(ref).suffix:
+            continue
+        candidates = [skill / ref]
+        if ref.startswith(("docs/", "scripts/")):
+            candidates.append(root / ref)
+        if not any(candidate.exists() for candidate in candidates):
+            missing_refs.append(f"{rel} -> {ref}")
+
+try:
+    manifest = tomllib.loads(manifest_path.read_text())
+    global_names = manifest.get("skills", [])
+except (OSError, tomllib.TOMLDecodeError) as exc:
+    errors.append(f"global-manifest.toml: cannot parse ({exc})")
+    global_names = []
+
+if len(global_names) != len(set(global_names)):
+    errors.append("global-manifest.toml: duplicate skill names")
+for name in global_names:
+    if name not in sources:
+        errors.append(f"global-manifest.toml: {name} has no canonical SKILL.md")
+
+# Surface direct references from globally selected skills to canonical skills
+# that are not globally available. This is a review finding, not an automatic
+# error: some references are intentionally on-demand or project-scoped.
+global_set = set(global_names)
+for name, item in metadata_errors:
+    if name in global_set:
+        errors.append(item)
+    else:
+        warnings.append(f"non-global metadata mismatch: {item}")
+for name in global_names:
+    if name not in sources:
+        continue
+    text = (sources[name][0] / "SKILL.md").read_text(errors="replace")
+    refs = sorted({ref for ref in re.findall(r"`([a-z0-9][a-z0-9-]*)`", text)
+                   if ref in sources and ref != name and ref not in global_set})
+    if refs:
+        warnings.append(f"global dependency outside manifest: {name} -> {', '.join(refs)}")
+
+# Explicit triggers are encouraged for auto-loaded global skills, but are not
+# mandatory for every project, vendor or command skill.
+global_set = set(global_names)
+warnings.extend(f"over 200 lines: {item}" for name, item in long_skills if name in global_set)
+warnings.extend(f"no explicit triggers (global): {item}" for name, item in missing_triggers if name in global_set)
+warnings.extend(f"missing relative reference: {item}" for item in missing_refs)
+warnings.extend(f"obsolete absolute skill path: {item}" for item in old_refs)
+
+print(f"lint: {len(sources)} canonical skills; {len(global_names)} global entries")
+for item in errors:
+    print(f"ERROR {item}")
+for item in warnings:
+    print(f"WARN  {item}")
+print(f"summary: {len(errors)} error(s), {len(warnings)} warning(s)")
+if errors or (strict and warnings):
+    raise SystemExit(1)
+PY
+}
+
+# ── Vendor provenance helpers ─────────────────────────────────────────────
+
+# Read one vendor entry from SOURCES.toml. Emits url, commit and optional path
+# on separate lines. This deliberately handles the small repository-owned TOML
+# shape rather than pretending to be a general TOML parser.
+source_entry() {
+    local name="$1"
+    python3 - "$SOURCES" "$name" <<'PY'
+import re
+import sys
+
+path, name = sys.argv[1:]
+text = open(path).read()
+match = re.search(r"(?ms)^\[" + re.escape(name) + r"\]\s*\n(.*?)(?=^\[|\Z)", text)
+if not match:
+    raise SystemExit(1)
+block = match.group(1)
+for key in ("url", "commit", "path"):
+    item = re.search(r"(?m)^" + key + r"\s*=\s*\"([^\"]*)\"\s*$", block)
+    print(item.group(1) if item else "")
+PY
+}
+
+# Update one existing vendor entry while preserving the surrounding file and
+# section order. The optional path makes renamed or multi-skill upstreams
+# reproducible at a pinned commit.
+update_source_entry() {
+    local name="$1" url="$2" commit="$3" skill_path="$4"
+    python3 - "$SOURCES" "$name" "$url" "$commit" "$skill_path" <<'PY'
+import re
+import sys
+
+path, name, url, commit, skill_path = sys.argv[1:]
+text = open(path).read()
+match = re.search(r"(?ms)^\[" + re.escape(name) + r"\]\s*\n(.*?)(?=^\[|\Z)", text)
+if not match:
+    raise SystemExit(f"missing SOURCES.toml entry: {name}")
+block = match.group(1)
+
+def set_field(body, key, value):
+    line = f'{key} = "{value}"'
+    pattern = re.compile(r"(?m)^" + re.escape(key) + r"\s*=\s*\"[^\"]*\"\s*$")
+    if pattern.search(body):
+        return pattern.sub(line, body, count=1)
+    return body.rstrip("\n") + "\n" + line + "\n"
+
+block = set_field(block, "url", url)
+block = set_field(block, "commit", commit)
+if skill_path:
+    block = set_field(block, "path", skill_path)
+else:
+    block = re.sub(r"(?m)^path\s*=\s*\"[^\"]*\"\s*\n?", "", block)
+
+text = text[:match.start(1)] + block + text[match.end(1):]
+open(path, "w").write(text)
+PY
+}
+
+# ── Subcommand: update ────────────────────────────────────────────────────
+# Refresh an existing vendored skill from its recorded upstream. The default
+# follows the upstream default branch; --ref is available for historical or
+# renamed paths. --dry-run never changes vendor/ or SOURCES.toml.
+
+cmd_update() {
+    local name="" dry_run=0 ref=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run) dry_run=1; shift ;;
+            --ref) ref="$2"; shift 2 ;;
+            --ref=*) ref="${1#*=}"; shift ;;
+            -*) echo "$(red 'error'): unknown option $1" >&2; return 2 ;;
+            *)
+                [[ -z "$name" ]] || { echo "$(red 'error'): update accepts one skill name" >&2; return 2; }
+                name="$1"; shift ;;
+        esac
+    done
+
+    if [[ -z "$name" ]]; then
+        echo "Usage: skills-deploy update <name> [--dry-run] [--ref <commit>]" >&2
+        return 2
+    fi
+    local dest="$VENDOR_DIR/$name"
+    [[ -f "$dest/SKILL.md" ]] || { echo "$(red 'error'): vendored skill not found: $name" >&2; return 1; }
+
+    local entry
+    entry="$(source_entry "$name")" || {
+        echo "$(red 'error'): no SOURCES.toml entry for vendored skill '$name'" >&2
+        return 1
+    }
+    local recorded_url recorded_commit recorded_path
+    {
+        IFS= read -r recorded_url || true
+        IFS= read -r recorded_commit || true
+        IFS= read -r recorded_path || true
+    } <<< "$entry"
+    if [[ -z "$recorded_url" || "$recorded_url" == UNKNOWN* || -z "$recorded_commit" || "$recorded_commit" == unverified ]]; then
+        echo "$(red 'error'): provenance for '$name' is unresolved; record a verified URL and commit first" >&2
+        return 1
+    fi
+
+    local tmp; tmp="$(mktemp -d)"
+    # shellcheck disable=SC2064
+    trap "rm -rf '$tmp'" EXIT
+
+    echo "$(dim "cloning $recorded_url …")"
+    git clone --quiet "$recorded_url" "$tmp/repo" >&2
+    if [[ -n "$ref" ]]; then
+        git -C "$tmp/repo" checkout --quiet --detach "$ref" || {
+            echo "$(red 'error'): ref '$ref' is not available in $recorded_url" >&2
+            return 1
+        }
+    fi
+
+    local commit; commit="$(git -C "$tmp/repo" rev-parse HEAD)"
+    local chosen=""
+    if [[ -n "$recorded_path" ]]; then
+        chosen="$tmp/repo/$recorded_path"
+        [[ -f "$chosen/SKILL.md" ]] || {
+            echo "$(red 'error'): recorded skill path '$recorded_path' is absent at $commit" >&2
+            echo "  $(dim 'Use --ref <commit> to inspect the historical path, or review the upstream rename.')" >&2
+            return 1
+        }
+    elif [[ -f "$tmp/repo/$name/SKILL.md" ]]; then
+        chosen="$tmp/repo/$name"
+    elif [[ -f "$tmp/repo/SKILL.md" ]]; then
+        chosen="$tmp/repo"
+    else
+        local -a found=() m
+        while IFS= read -r m; do found+=("$(dirname "$m")"); done \
+            < <(find "$tmp/repo" -name SKILL.md -not -path '*/node_modules/*' 2>/dev/null)
+        if [[ ${#found[@]} -eq 1 ]]; then
+            chosen="${found[0]}"
+        else
+            echo "$(red 'error'): cannot identify '$name' in upstream at $commit" >&2
+            printf '  %s\n' "${found[@]}" >&2
+            return 1
+        fi
+    fi
+
+    local skill_path=""
+    [[ "$chosen" != "$tmp/repo" ]] && skill_path="${chosen#"$tmp/repo/"}"
+    local diff
+    # Name-only output deliberately ignores timestamp metadata while checksum
+    # comparison still detects changed file content and structure.
+    diff="$(rsync -rL --checksum --delete --dry-run --out-format='%n' \
+        "${STRIP_EXCLUDES[@]}" "$chosen/" "$dest/" || true)"
+    local source_changed=0
+    [[ "$commit" != "$recorded_commit" || "$skill_path" != "$recorded_path" ]] && source_changed=1
+
+    echo "$(cyan 'update') $name"
+    echo "  source: $recorded_url"
+    echo "  commit: $commit"
+    [[ -n "$skill_path" ]] && echo "  path:   $skill_path"
+    if [[ -n "$diff" ]]; then
+        echo "  $(yellow 'content changes')"
+        echo "$diff" | sed 's/^/    /'
+    else
+        echo "  $(dim 'content unchanged')"
+    fi
+    if [[ "$commit" != "$recorded_commit" ]]; then
+        echo "  pin:    $recorded_commit → $commit"
+    fi
+    [[ "$skill_path" != "$recorded_path" ]] && echo "  path pin: ${recorded_path:-<none>} → ${skill_path:-<root>}"
+
+    if [[ $dry_run -eq 1 ]]; then
+        echo "  $(dim '(dry-run — no vendor or provenance changes written)')"
+        return 0
+    fi
+    if [[ -n "$diff" ]]; then
+        rsync -aL --delete "${STRIP_EXCLUDES[@]}" "$chosen/" "$dest/"
+    fi
+    if [[ $source_changed -eq 1 ]]; then
+        update_source_entry "$name" "$recorded_url" "$commit" "$skill_path"
+    fi
+    if [[ -n "$diff" || $source_changed -eq 1 ]]; then
+        echo "$(green 'updated'): $name"
+    else
+        echo "$(green 'up to date'): $name"
     fi
 }
 
@@ -634,6 +1096,10 @@ cmd_fetch() {
     else
         sname="$(basename "$chosen")"
     fi
+    local skill_path=""
+    [[ "$chosen" != "$tmp/repo" ]] && skill_path="${chosen#"$tmp/repo/"}"
+    local skill_path=""
+    [[ "$chosen" != "$tmp/repo" ]] && skill_path="${chosen#"$tmp/repo/"}"
     local dest="$VENDOR_DIR/$sname"
     if [[ -e "$dest" ]]; then
         echo "$(red 'error'): vendor destination already exists: $dest" >&2
@@ -647,6 +1113,7 @@ cmd_fetch() {
     # Append provenance to SOURCES.toml.
     local entry
     entry="$(printf '[%s]\nurl = "%s"\ncommit = "%s"\n' "$sname" "$url" "$commit")"
+    [[ -n "$skill_path" ]] && entry+="$(printf 'path = "%s"\n' "$skill_path")"
     if [[ -f "$SOURCES" ]] && grep -q "^\[$sname\]" "$SOURCES"; then
         echo "$(yellow 'note'): $sname already in SOURCES.toml — provenance not updated" >&2
     else
@@ -680,7 +1147,7 @@ cmd_list() {
     done < <(canonical_skill_names | sort -u)
     echo
     echo "$(cyan 'targets'):"
-    targets | sed 's/^/  /'
+    global_targets | sed 's/^/  /'
     echo
     echo "$(cyan 'allowlist'):"
     if [[ -f "$ALLOWLIST" ]]; then
@@ -714,6 +1181,15 @@ Subcommands:
                                      Gather ALL orphan skills (in targets but not
                                      canonical) in one pass. The bulk-drift cure.
                                      Handles orphan drift only, not content drift.
+  audit [--dest <project>]           Compare resolved target names and content
+                                     with canonical skills. Read-only; exits
+                                     non-zero when differences are found.
+  lint [--strict]                    Check canonical skill structure, metadata,
+                                     references and manifest closure. Read-only;
+                                     --strict treats warnings as failures.
+  update <name> [--dry-run] [--ref <commit>]
+                                     Refresh a vendored skill from SOURCES.toml;
+                                     --ref supports historical pinned paths.
   fetch <owner/repo> [--skill <name>] [--list]
                                      Acquire a third-party skill into vendor/ via git
   list                               Show canonical skills, targets, and allowlist
@@ -743,6 +1219,9 @@ main() {
         deploy)    cmd_deploy "$@" ;;
         gather)    cmd_gather "$@" ;;
         reconcile) cmd_reconcile "$@" ;;
+        audit)     cmd_audit "$@" ;;
+        lint)      cmd_lint "$@" ;;
+        update)    cmd_update "$@" ;;
         fetch)     cmd_fetch "$@" ;;
         list)      cmd_list ;;
         -h|--help|help) usage ;;
