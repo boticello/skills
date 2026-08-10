@@ -1,6 +1,12 @@
 ---
 name: jj-vcs
 description: Canonical Jujutsu (jj) playbook for linear-history workflow, safe change splitting, troubleshooting, and recovery in agent-driven repositories.
+triggers:
+  - jj status
+  - jj diff
+  - jj log
+  - jj restore
+  - Jujutsu
 ---
 
 # Jujutsu (jj) Playbook
@@ -44,6 +50,17 @@ It does not by itself define domain-specific workflow semantics such as:
 - NEVER run `jj` commands in parallel.
 - Never create sibling changes unless explicitly asked.
 - Never fetch or sync remote state unless explicitly asked.
+
+## When to Record a Local Save-Point
+
+When a scoped jj work unit has passed its acceptance checks, record the local
+change using the repository's jj workflow; no separate approval is needed for
+each local save-point under the adopted work-unit policy. Keep the change
+within the ticket or explicit request's scope and inspect the resulting
+description and diff.
+
+This local rule does not authorise remote synchronisation, landing, deployment,
+or publication. Those remain separate actions requiring explicit user approval.
 
 ## Core Mental Model
 
@@ -97,6 +114,6 @@ When work goes wrong, prefer recovery over history rewriting:
 When the work happens inside a system with additional meaning attached to the `jj` working copy, use a process skill as well.
 
 Example:
-- [`work-unit-manage`](/Users/bear/Me/00-system/agents/skills/work-unit-manage/SKILL.md) provides the abstract lifecycle guidance.
-- [`jj-change-manage`](/Users/bear/Me/00-system/agents/skills/jj-change-manage/SKILL.md) provides the concrete `jj` workflow for classifying and managing the current change correctly.
-- [`execution-spine`](/Users/bear/Me/00-system/agents/skills/execution-spine/SKILL.md) provides the tool-agnostic execution loop.
+- `work-unit-manage` provides the abstract lifecycle guidance.
+- `jj-change-manage` provides the concrete `jj` workflow for classifying and managing the current change correctly.
+- `execution-spine` provides the tool-agnostic execution loop.

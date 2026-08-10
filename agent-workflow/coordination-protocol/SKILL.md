@@ -44,7 +44,8 @@ lead; shape first.
 
 WHEN a brief exists (scope, checkpoints, done-criteria) → supervisor
 posture.
-*Failure:* Agent refines the brief endlessly. → Commit it, transition.
+*Failure:* Agent refines the brief endlessly. → Record the stable brief as a
+durable artefact and transition to execution.
 
 WHEN the agent catches itself implementing instead of bounding → stop,
 write a ticket, return to posture.
@@ -66,6 +67,11 @@ feels like progress (acting on the frame) is the failure; pausing to
 verify is the work. This is the symmetric counterpart to "stop
 implementing, return to posture": there it was *executing* before
 *bounding*; here it is *acting* before *verifying the frame*.
+
+This rule governs conceptual re-framing and the resulting tracker, plan or
+workspace reorganisation. It is not a blanket pause before reversible
+execution steps; whether a local VCS action is authorised belongs to the
+work-unit and backend-specific VCS policy.
 
 ### Phase-transition readiness gate
 
@@ -124,6 +130,20 @@ WHEN a required stage completes without its artifact → the next stage refuses
 to proceed. Conditional reflection and decision artifacts are required only
 when the transition gate enters those states. No required artifact, no
 advance.
+
+This is a process contract, not deterministic enforcement by the prose itself.
+Unless a tool or an independent reviewer checks the artifact, a reviewer may
+mistake a summary or commit identifier for the required report. Treat the
+absence of an enforceable check as an evidence limitation, not as proof that
+the gate was passed.
+
+### Worked enforcement example
+
+In the D3 evaluation, an executor committed work without filing the required
+report, and a reviewer accepted the commit identifier in chat as if it were
+the report. The failure was not a missing principle; it was an unenforced
+artifact gate. The remedy is to require the report as a distinct artefact and
+check it explicitly before accepting the phase.
 
 ## Activity types
 

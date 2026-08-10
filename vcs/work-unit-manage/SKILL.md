@@ -1,6 +1,12 @@
 ---
 name: work-unit-manage
 description: Manage a coherent unit of work across start, work, and end phases, and choose the correct backend-specific workflow before changing durable state.
+triggers:
+  - work unit
+  - start a work unit
+  - finish a work unit
+  - durable workstream
+  - change boundary
 ---
 
 # work-unit-manage
@@ -22,8 +28,8 @@ It helps the agent:
 Use this skill for the abstract lifecycle.
 
 Then choose the concrete backend workflow:
-- [`jj-vcs`](/Users/bear/Me/00-system/agents/skills/jj-vcs/SKILL.md) + [`jj-change-manage`](/Users/bear/Me/00-system/agents/skills/jj-change-manage/SKILL.md)
-- [`git-vcs`](/Users/bear/Me/00-system/agents/skills/git-vcs/SKILL.md) + [`git-change-manage`](/Users/bear/Me/00-system/agents/skills/git-change-manage/SKILL.md)
+- `jj-vcs` + `jj-change-manage`
+- `git-vcs` + `git-change-manage`
 
 If the surrounding system adds more meaning, such as ticket linkage, review gates, or deployment workflow, layer that guidance on top.
 
@@ -46,6 +52,10 @@ If the surrounding system adds more meaning, such as ticket linkage, review gate
 ### End
 
 - ensure the durable state reflects what was actually done
+- after acceptance evidence passes, record a local save-point using the
+  selected backend's commit/change policy
+- treat merge, remote synchronisation, deployment, and publication as separate
+  external gates requiring their own approval
 - identify whether follow-up work should become a separate unit
 - leave enough context for resumption, handoff, or review
 

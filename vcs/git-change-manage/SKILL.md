@@ -1,6 +1,12 @@
 ---
 name: git-change-manage
 description: Manage a coherent unit of work in Git by choosing the right branch or worktree, keeping staging intentional, and closing with a coherent commit history.
+triggers:
+  - Git worktree
+  - Git branch
+  - Git work unit
+  - manage a Git change
+  - Git commit workflow
 ---
 
 # git-change-manage
@@ -10,8 +16,8 @@ Use this skill whenever work happens in a `git`-managed repository and the agent
 ## Relationship To The Wider Stack
 
 Use:
-- [`work-unit-manage`](/Users/bear/Me/00-system/agents/skills/work-unit-manage/SKILL.md) for the abstract lifecycle of a work unit
-- [`git-vcs`](/Users/bear/Me/00-system/agents/skills/git-vcs/SKILL.md) for safe `git` command usage and mental models
+- `work-unit-manage` for the abstract lifecycle of a work unit
+- `git-vcs` for safe `git` command usage and mental models
 
 This skill adds the concrete `git` workflow:
 - how to classify the current branch or worktree
@@ -29,7 +35,7 @@ It is for moments when the agent would otherwise drift into:
 
 ## Core Mental Model
 
-- The generic `git` rules come from [`git-vcs`](/Users/bear/Me/00-system/agents/skills/git-vcs/SKILL.md).
+- The generic `git` rules come from `git-vcs`.
 - In `git`, the branch or worktree usually carries the unit-of-work context.
 - The working tree is in-progress state.
 - The index is the selected diff for the next commit.
@@ -43,8 +49,10 @@ Before starting work in a `git` repo:
 2. Check the current branch with `git branch --show-current`
 3. Inspect recent history with `git log --oneline -n 5` when the context is not obvious
 4. Classify the current branch or worktree state
-5. Only then decide whether to continue, switch, or create fresh context
-6. If the surrounding system uses ticket, PR, or review linkage, inspect that linkage before deciding
+5. If the branch is `main`, `master`, or another default branch, establish a
+   dedicated branch or worktree before editing or committing
+6. Only then decide whether to continue, switch, or create fresh context
+7. If the surrounding system uses ticket, PR, or review linkage, inspect that linkage before deciding
 
 ## Canonical Work-Unit States
 
@@ -93,6 +101,9 @@ Action:
 
 - Inspect both unstaged and staged diffs before committing.
 - Ensure the commit or small commit sequence reflects one coherent outcome.
+- Once the unit's acceptance evidence passes, use `git-vcs`'s **When to Commit**
+  rule to record the local save-point unless the user explicitly asked to hold
+  the work uncommitted.
 - Leave the branch understandable to the next person or next session.
 - Make follow-up work explicit instead of bundling it in "while I'm here" edits.
 

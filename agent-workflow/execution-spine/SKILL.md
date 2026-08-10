@@ -50,6 +50,8 @@ For each unit of work in the plan:
    the system in a working state after each unit.
    *Failure mode (mega-commit):* Multiple unrelated changes bundled. →
    Split. Atomic commits are recoverable; bundles are not.
+   Use the backend's explicit local-commit policy for the save-point; a local
+   commit does not imply permission to merge, push, deploy, or publish.
 3. **Verify the unit.** Run the verification approach from the plan
    (tests, build, lint, or equivalent for non-coding work). Record
    pass/fail.
@@ -62,6 +64,19 @@ For each unit of work in the plan:
    *Failure mode (silent progress):* Work happens but nothing is
    recorded. → Progress notes are not optional; they're the evidence
    trail.
+
+   This is a process requirement, not automatic enforcement. A reviewer
+   should not infer that a commit identifier or conversational summary is a
+   report; if no tool checks the artefact, the supervisor must check it
+   explicitly.
+
+### Worked enforcement example
+
+In the D3 evaluation, the executor committed work without producing the
+required report and the reviewer accepted the commit identifier as a
+substitute. The lesson is operational: a written gate is not the same as a
+checked artefact. Require the report as its own object and verify it before
+advancing the unit.
 
 ## Deviation handling
 

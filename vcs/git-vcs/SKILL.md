@@ -1,6 +1,12 @@
 ---
 name: git-vcs
 description: Canonical Git playbook for branch-based linear-history workflow, safe staging, inspection, and recovery in agent-driven repositories.
+triggers:
+  - Git status
+  - Git diff
+  - Git commit
+  - Git branch
+  - Git recovery
 ---
 
 # git-vcs
@@ -16,7 +22,8 @@ Use it to understand:
 
 This skill is the shared command and affordance layer.
 
-Use [`git-change-manage`](/Users/bear/Me/00-system/agents/skills/git-change-manage/SKILL.md) when you need the concrete workflow for managing a work unit in a `git`-centric repo or harness.
+Use the `git-change-manage` skill when you need the concrete workflow for
+managing a work unit in a `git`-centric repo or harness.
 
 ## Scope
 
@@ -52,6 +59,28 @@ The index is not just an implementation detail. It is part of how a coherent wor
 - Avoid destructive commands such as `git reset --hard`, `git checkout --`, or `git clean -fd` unless explicitly asked.
 - Never mutate `git` in parallel in the same working copy.
 - Never fetch, pull, push, or force-push unless explicitly asked.
+
+## When to Commit
+
+A local commit is part of closing a coherent work unit when all of these are
+true:
+
+- a ticket or explicit user request defines the unit's scope and outcome;
+- the work is on a dedicated non-default branch or worktree;
+- the unit's acceptance evidence has passed; and
+- the staged diff has been inspected and contains only that unit.
+
+Under this repository's adopted workflow, that local commit needs no separate
+approval for each save-point. If work begins on `main` or `master`, establish
+the dedicated branch or worktree before editing or committing; use the
+repository's `codex/` branch convention unless the user or project says
+otherwise.
+
+This authorisation is limited to recording the verified work on the local
+branch. It does not authorise merge, push, force-push, deployment, publication,
+or any other external operation. Those actions require explicit user approval.
+Tracker bookkeeping follows the same deliberate scope; the tracker adapter
+does not grant blanket permission to commit implementation work.
 
 ## Safe Inspection
 
@@ -96,5 +125,5 @@ If recovery is needed, prefer the least destructive option and explain the plan 
 
 ## Related Skills
 
-- [`work-unit-manage`](/Users/bear/Me/00-system/agents/skills/work-unit-manage/SKILL.md) for the abstract work-unit lifecycle
-- [`git-change-manage`](/Users/bear/Me/00-system/agents/skills/git-change-manage/SKILL.md) for the concrete `git` workflow
+- `work-unit-manage` for the abstract work-unit lifecycle
+- `git-change-manage` for the concrete `git` workflow

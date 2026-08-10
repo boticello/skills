@@ -63,9 +63,14 @@ underneath changes. `br` supplies the verbs (`ready`, `update --claim`,
 The gotchas that cause a wrong action if not internalized up front:
 
 - **SQLite is canonical; JSONL is an export.** Every mutation writes to
-  `beads.db` and auto-exports `issues.jsonl` — commit `.beads/` with no flush
-  step. The manual sync modes: `br sync --import-only` after `git pull` (the
-  pull may bring in JSONL written elsewhere); `--flush-only` for bulk triage
+  `beads.db` and auto-exports `issues.jsonl` — persist `.beads/` according to
+  the repository's VCS policy; no flush step is needed. This tracker
+  bookkeeping is separate from any decision to commit the implementation.
+  When a scoped work unit is verified, follow the repository's `git-vcs` or
+  `jj-vcs` local-save-point policy; this adapter does not authorise remote
+  operations.
+  The manual sync modes: `br sync --import-only` after `git pull` (the pull
+  may bring in JSONL written elsewhere); `--flush-only` for bulk triage
   paired with `--no-auto-flush`; `--rebuild` to make the DB match a hand-edited
   JSONL (the only sanctioned hand-edit path, for bulk rewrites/ID renames). See
   the cheatsheet's "Storage model" and "Sync" sections.
@@ -77,6 +82,9 @@ The gotchas that cause a wrong action if not internalized up front:
   `system-*`). A foreign-prefix ID needs `--db <path>` or a `cd` into the
   owning repo — bare `br show <foreign-id>` queries the wrong DB and reports
   "not found" or a collision.
+- **ID convention.** Use the tracker prefix and the tool-generated short code
+  only, such as `skills-8cj`. Do not pass `--slug`; the title carries the
+  description and the ID should remain short and typeable.
 - **`--reason` is the durable record.** Whatever you close, `--reason` holds the
   outcome and evidence. Whether closure is the right move at a given point —
   whether the work is verified, reviewed, or ready to be closed — is a

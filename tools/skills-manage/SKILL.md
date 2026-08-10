@@ -156,6 +156,12 @@ why no per-harness manifests, why copies not symlinks), read
 
 6. Commit in the canonical repo (both the skill AND the manifest change).
 
+### Validation
+
+Use `./deploy/skills-deploy lint` from the canonical repository for the
+repository-wide quality check. For the installed generic validator's scope
+and its compatibility with repository metadata, read `references/validation.md`.
+
 **Never edit targets directly.** They are mirrors of canonical. Any change
 made in `~/.agents/skills/` or `~/.codex/skills/` will be overwritten on the
 next deploy.
@@ -343,8 +349,6 @@ usually where the cut command reference should land.
 - **Editing a deployed skill in place.** Same — overwritten. Edit canonical.
 - **Using symlinks to share skills across targets.** Codex has a known bug
   where symlinked skill dirs silently fail to load. Deploy copies real dirs.
-- **Forgetting to commit after authoring.** Canonical is git-tracked; if it's
-  not committed, it's not reproducible.
 - **Expecting a registry/lockfile.** There isn't one. The directory tree is
   the state. `git log` is your provenance for authored skills; `SOURCES.toml`
   is your provenance for vendored ones.
