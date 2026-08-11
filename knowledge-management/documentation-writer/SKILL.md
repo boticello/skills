@@ -272,7 +272,7 @@ Shared micro-docs: `00-notes/shared/micro/<area>/<name>.md`
 
 If an existing maintained note already owns the topic, prefer updating that note over creating a new micro-doc.
 
-### Integration with feature-handoff
+### Integration with supervised work
 
-Micro-docs are queried before delegation and captured after implementation,
-creating a knowledge loop that improves over time.
+The supervisor asks workers to consult relevant micro-docs before delegated
+work and to capture reusable findings afterwards, creating a knowledge loop.

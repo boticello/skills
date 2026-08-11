@@ -53,8 +53,7 @@ fail silently or hit the wrong database.
 `br` does not own the operational lifecycle. When work is ready, who claims it,
 the execution/verification/review sequence, when closure is permitted, and how
 phase transitions or handoffs happen are tracker-independent policy. They
-belong to the coordination protocol and posture skills (`coordination-protocol`,
-`supervisor`, `execution-spine`). The same lifecycle must work if the tracker
+belong to `supervisor` and `execution-spine`. The same lifecycle must work if the tracker
 underneath changes. `br` supplies the verbs (`ready`, `update --claim`,
 `close --reason`); it does not prescribe the order or the gates between them.
 
@@ -88,7 +87,7 @@ The gotchas that cause a wrong action if not internalized up front:
 - **`--reason` is the durable record.** Whatever you close, `--reason` holds the
   outcome and evidence. Whether closure is the right move at a given point —
   whether the work is verified, reviewed, or ready to be closed — is a
-  lifecycle decision, not a `br` rule; see `coordination-protocol`. If you are
+  lifecycle decision, not a `br` rule; see `supervisor`. If you are
   not closing, record progress as a comment instead.
 - **Never run bare `bv`.** It launches an interactive TUI that blocks the
   session. Always use `--robot-*` flags (`--robot-next`, `--robot-triage`).
@@ -102,7 +101,7 @@ The gotchas that cause a wrong action if not internalized up front:
   config, sync modes, the full gotcha list, and troubleshooting. Read it before
   any write.
 - `br-new` wrapper (`~/Me/OS/scripts/bin/br-new`) — fixes `br create -f` semantics.
-- `coordination-protocol` — owns the lifecycle this skill defers: readiness,
+- `supervisor` — owns the lifecycle this skill defers: readiness,
   claim, execution/review sequence, phase transition, and closure policy.
 - `git-vcs` / `git-change-manage` — commit and session-end workflow.
 - `execution-spine` / `supervisor` — posture skills that consume the lifecycle.

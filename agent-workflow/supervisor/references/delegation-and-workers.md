@@ -1,6 +1,10 @@
 # Delegation and Workers
 
-Use this reference when deciding whether to delegate and how to manage workers at the phase-supervision level. For implementation or documentation workers that may edit files, load `feature-handoff`; it owns the detailed protocol for write ownership, access mode, worker prompts, staged patches, manifests, live-state ledgers, and integration.
+Use this reference when deciding whether to delegate and how to manage workers
+at the phase-supervision level. The supervisor assigns every worker directly;
+workers do not dispatch one another. For implementation or documentation work,
+make the ownership, access mode, paths, handoff evidence and integration point
+explicit in the supervisor's prompt.
 
 ## When to Delegate
 
@@ -29,7 +33,7 @@ Avoid large worker pools by default. Prefer one recon worker plus one implementa
 
 ## Worker Prompt Checklist
 
-For workers that may edit files, use the fuller prompt checklist in `feature-handoff`. This checklist is only the supervisor-level minimum.
+This checklist is the minimum prompt contract for workers that may edit files.
 
 Each worker prompt should state:
 

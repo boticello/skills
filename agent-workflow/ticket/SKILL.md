@@ -101,15 +101,18 @@ tracker write loop — the specialist owns all Backlog writes and searches.
 Reads (`view`/`show`) need no specialist: run them directly, and never
 hand-edit `backlog/` files.
 
-## Git handoff
+## Git boundary
 
 The ticket-specialist does not commit implementation, documentation,
-configuration, generated output, branches, or worktrees. When resolving a
-ticket also needs one of those Git mutations, give the ticket-specialist the
-exact paths, requested commit message, and branch context. It delegates that
-operation to the project's git-specialist and reports the verified result.
-Tracker-record and non-tracker Git mutations must be serial; do not ask the
-two specialists to mutate one working copy concurrently.
+configuration, generated output, branches, or worktrees. It must not delegate
+to a Git specialist. The **main agent is the sole coordinator**: it instructs
+the ticket-specialist for tracker changes and the Git specialist separately
+for non-tracker Git operations, then interprets both reports.
+
+Backlog tracker-record commits and non-tracker Git mutations must be serial
+when they share a working copy. The ticket-specialist commits only the exact
+tracker paths it changed; the Git specialist owns branch/worktree/rebase/land
+work and the associated verification.
 
 ## Gotchas
 

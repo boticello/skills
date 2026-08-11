@@ -1,54 +1,85 @@
 ---
 name: supervisor
-description: Use when a phase of work is already scoped and needs execution management — delegation, subagent coordination, verification, integration, reporting, and phase handoff. Trigger when the user asks to supervise, manage a phase, delegate work, coordinate executors, or run a bounded engineering effort with clear ownership.
+description: Use when a scoped phase of structured work needs a single coordinator — research, design, planning, execution, review, integration, reporting, or handoff. The supervisor chooses the needed work pattern, delegates directly where useful, and owns every transition between them.
 ---
 
 # Supervisor
 
-Use this skill to run a bounded phase of engineering work with clear ownership. The supervisor owns the phase outcome: plan the work, delegate only where useful, integrate results, verify the system state, report honestly, and retire before context becomes a liability.
+Use this skill to run a bounded phase with clear ownership. The supervisor owns
+the phase outcome: choose the work pattern, delegate only where useful,
+integrate results, verify the state, report honestly, and retire before
+context becomes a liability.
 
 ## Operating Loop
 
 1. Establish the current state: objective, phase boundary, repo/workspace locations, dirty state, active workers, live services, previous reports, and unresolved risks.
-2. Shape the phase: define the next coherent slice, acceptance criteria, non-goals, likely risks, and what evidence will prove the phase is done.
-3. Decide execution mode:
-   - Do the work directly when the task is tightly coupled, urgent, small, or blocked by unavailable workers.
-   - Delegate when work is bounded, parallelisable, independently reviewable, or benefits from a fresh perspective.
-   - Run recon before implementation when the design surface is unclear.
-   - For split or extraction work, prefer this order unless there is a specific blocker: runtime boundary, then namespace/ownership boundary, then packaging boundary, then contract or behaviour changes.
-4. Integrate deliberately: inspect worker outputs, reconcile conflicting findings, review diffs, keep repo and workspace artefacts separate, and avoid accepting implementation by summary alone.
-5. Verify before declaring progress: run relevant tests, smoke live paths where appropriate, check docs/help output when UX changed, and record skipped or deferred checks.
-6. Report the phase result: what changed, what was verified, what remains uncertain, current repo/workspace status, and the recommended next slice.
-7. Retire when context is stale or the phase boundary is clean enough for a better supervisor handoff.
+2. Shape the next coherent unit: scope, non-goals, acceptance criteria, risks,
+   decision owner and the evidence that will prove it is done.
+3. Choose the work pattern; do not apply an implementation template to every
+   kind of work:
+   - **Research/diagnosis:** frame the question, source the evidence, state the
+     conclusion and residual uncertainty. It may end here.
+   - **Design:** compare viable approaches, make trade-offs explicit, and
+     obtain the required decision before committing the architecture.
+   - **Planning:** turn an accepted brief/design into bounded slices, risks,
+     dependencies and verification gates.
+   - **Execution:** make the approved, bounded change using the relevant
+     execution and VCS discipline.
+   - **Review:** independently compare the result with the brief/design and
+     evidence; review is not the implementer's completion summary.
+4. Decide delivery mode: work directly when tightly coupled or small;
+   delegate only bounded, independently reviewable work; run research before
+   design or execution when material facts are uncertain.
+5. Integrate deliberately: inspect outputs and diffs, reconcile conflicting
+   findings, keep repo/workspace/live state separate, and avoid accepting work
+   by summary alone.
+6. Verify and review before advancing. Accepted output is not automatically
+   readiness for the next phase: record unresolved trade-offs, decisions or
+   evidence gaps before rewriting the brief or starting new execution.
+7. Report what changed or was learned, evidence, residual risks, state, and
+   the recommended next action. Retire when context is stale or the phase
+   boundary is clean enough for a new supervisor.
 
 The supervisor owns the phase handoff prompt. Do not delegate the handoff
-prompt itself. Workers may contribute recon, implementation, review, or report
-inputs, but the retiring supervisor must compose the final handoff so the next
-turn mode and deliverable are explicit.
+prompt itself. Workers may contribute research, implementation, review, or
+report inputs, but the retiring supervisor must compose the final handoff so
+the next turn mode and deliverable are explicit.
+
+## Coordination boundary
+
+The supervisor is the sole coordinator. A specialist may perform its assigned
+operation and report evidence, but must not dispatch another specialist or
+advance ticket/phase state on the supervisor's behalf. For example, the
+supervisor instructs the tracker specialist and Git specialist separately,
+then decides what happens next. This keeps authority, sequencing and failure
+handling visible in one place.
 
 ## Related Skills
 
 Load related skills as needed rather than duplicating their instructions here:
 
-- `feature-handoff`: mandatory when delegating implementation or documentation edits to subagents; it is the source of truth for delegated write ownership, access mode, worker prompts, manifests, integration, and live-state ledgers. Use it for recon, review, or black-box trials when those tasks may lead to implementation handoff.
-- `plan`: use when a phase needs a written implementation plan before execution.
+- `lead`: use before supervision when the user has not yet supplied a usable brief.
+- `code-and-docs-search` and relevant domain skills: use for research or diagnosis.
 - `write-design-doc`: use when the work needs a technical design, trade-off analysis, or architecture proposal.
-- `verify`: use before merge, promotion, release, or handoff.
-- `retro`: use at phase boundaries when process lessons should become durable guidance.
-- `git-change-manage`, `git-vcs`, `jj-change-manage`, `jj-vcs`, or `work-unit-manage`: use according to the repository's VCS workflow before changing durable state.
+- `spike-planning`: use when an accepted design needs an implementation and verification plan.
+- `execution-spine`: use for an executor carrying out a scoped unit.
+- `verify` and, where relevant, `code-review`: use for verification and independent review.
+- project tracker skills: use for tracker operations only; the supervisor owns lifecycle decisions.
+- `retro`: use at a phase boundary only when a process lesson should become durable guidance.
+- `git-change-manage`, `git-vcs`, `jj-change-manage`, or `jj-vcs`: use according to the repository's VCS workflow before changing durable state.
 
 ## Progressive References
 
 Read only the reference needed for the current supervision problem:
 
 - `references/phase-lifecycle.md`: phase shaping, acceptance criteria, reports, verification gates, and how to classify trial findings.
-- `references/delegation-and-workers.md`: delegation decisions, worker model selection, prompt boundaries, black-box trials, and worker lifecycle hygiene.
+- `references/delegation-and-workers.md`: delegation decisions, worker prompt boundaries, black-box trials, and worker lifecycle hygiene.
 - `references/retirement-and-handoff.md`: when a supervisor should retire, how to announce it, and how to write the handoff prompt.
 
 ## Hard Rules
 
 - Keep repo state, workspace artefacts, live database state, and worker state explicit and separate.
-- Before delegating any worker that may edit files, load `feature-handoff` and follow its implementation-delegation protocol.
+- Give each worker a bounded objective, authority, excluded areas, required evidence and stop condition. Do not make workers coordinate each other.
 - After delegating a write set, do not edit that write set locally until the worker is complete, cancelled, or explicitly reassigned.
 - Before claiming a worker limitation, check whether the relevant delegation or thread-management tool actually exists in the current session.
 - Do not use unrelated worker systems to infer Codex subagent state. If the available subagent tool cannot spawn or list workers, report that exact limitation.

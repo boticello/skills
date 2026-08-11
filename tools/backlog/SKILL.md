@@ -152,8 +152,7 @@ second passes for deps/comments/closure. Key design points:
 - `br` skill + cheatsheet — the retired predecessor tracker (beads); migration
   source. Its `.beads/` is frozen after cutover — never write to it.
 - `cheatsheets` — the reference tier for command shapes.
-- `coordination-protocol` / `execution-spine` — lifecycle policy this skill
-  defers to.
+- `supervisor` — lifecycle policy this skill defers to.
 - `git-vcs` / `git-change-manage` — commit workflow (backlog/ is plain files).
 - alan-puzzle's `ticket` skill — the main-agent ticket workflow; the
   project's ticket-specialist task agent uses this skill as its usage
