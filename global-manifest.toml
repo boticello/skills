@@ -8,22 +8,20 @@
 #
 # NOTE: adding a new skill to canonical requires adding it here too, or it
 # won't deploy globally. Run reconcile/deploy --dry-run to catch drift.
+#
+# 2026-08-18 surgery: removed 7 entries whose canonical sources were deleted
+# (almanac, backlog, br, git-change-manage, git-vcs, jj-change-manage, jj-vcs)
+# — these crashed deploy/audit under set -e. 13 skills remain.
 
-# 19 skills (tools, VCS, search, personal)
+# 13 skills (tools, search, personal)
 skills = [
-    "almanac",
     "bin-creator",
-    "backlog",
-    "br",
     "cbm",
     "cheatsheets",
     "code-and-docs-search",
     "file-introspection",
     "filesearch",
-    "git-change-manage",
-    "git-vcs",
-    "jj-change-manage",
-    "jj-vcs",
+    "graphql",
     "lark-crm",
     "mcp-manage",
     "op-env-wrap-tool",

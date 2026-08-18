@@ -11,3 +11,14 @@ brooks-*
 
 # Empty leftover from an old Codex runtime experiment
 codex-primary-runtime
+
+# Orca-installed skills in ~/.agents/skills (managed by the Orca app)
+orca-cli
+orca-linear
+orchestration
+
+# ZCode plugin skill installed into ~/.agents/skills (managed by ZCode plugins)
+find-skills
+
+# Bear's saggar CLI skill in ~/.codex/skills (not in canonical store)
+saggar-cli
