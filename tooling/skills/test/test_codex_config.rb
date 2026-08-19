@@ -127,6 +127,89 @@ class CodexConfigTest < Minitest::Test
     end
   end
 
+  def test_prune_preserves_unrelated_whitespace_byte_for_byte
+    with_codex_sandbox do |_root, home, config_path|
+      dead = "#{home}/.agents/skills/gone/SKILL.md"
+      live = "#{home}/.agents/skills/alpha/SKILL.md"
+      original = "model = \"x\"\n\n\n# keep spacing\n[[skills.config]]\npath = #{dead.inspect}\nenabled = false\n\n[[skills.config]]\npath = #{live.inspect}\nenabled = false\n"
+      File.write(config_path, original)
+
+      pruned, removed = Skills::CodexConfig.load(config_path).prune_text
+
+      assert_equal [dead], removed
+      assert pruned.start_with?("model = \"x\"\n\n\n# keep spacing\n")
+    end
+  end
+
+  def test_prune_can_remove_the_final_skills_config_entry
+    with_codex_sandbox do |_root, home, config_path|
+      dead = "#{home}/.agents/skills/gone/SKILL.md"
+      File.write(config_path, "model = \"x\"\n\n[[skills.config]]\npath = #{dead.inspect}\nenabled = false\n")
+
+      pruned, removed = Skills::CodexConfig.load(config_path).prune_text
+
+      assert_equal [dead], removed
+      assert_equal({ "model" => "x" }, TomlRB.parse(pruned))
+    end
+  end
+
+  def test_doctor_retires_legacy_codex_managed_copies_with_backup
+    with_codex_sandbox do |root, home, _config_path|
+      legacy = home.join(".codex/skills/alpha")
+      FileUtils.mkdir_p(legacy)
+      File.write(legacy.join("SKILL.md"), "legacy")
+      state = home.join("state")
+      previous = ENV["XDG_STATE_HOME"]
+      ENV["XDG_STATE_HOME"] = state.to_s
+      begin
+        manager = Skills::Manager.new(root: root, home: home)
+
+        preview = manager.doctor(fix: true)
+        assert_includes preview.payload[:planned_legacy_paths], legacy.to_s
+        assert_path_exists legacy
+
+        applied = manager.doctor(fix: true, apply: true)
+        assert_includes applied.payload[:retired_legacy_paths], legacy.to_s
+        refute_path_exists legacy
+        assert Dir.glob(state.join("skills-backups/*/alpha/SKILL.md")).one?
+      ensure
+        ENV["XDG_STATE_HOME"] = previous
+      end
+    end
+  end
+
+  def test_doctor_recomputes_findings_after_fix_instead_of_substring_filtering
+    with_codex_sandbox do |root, home, config_path|
+      dead = "#{home}/.agents/skills/gone/SKILL.md"
+      File.write(config_path, "model = \"x\"\n\n[[skills.config]]\npath = #{dead.inspect}\nenabled = false\n")
+      config = Skills::Config.load(root)
+      catalog = Skills::Catalog.new(config)
+      profiles = Skills::Profiles.new(config: config)
+      projects = Skills::Projects.new(config: config, catalog: catalog)
+      unrelated = Skills::Finding.new(:warning, "unrelated finding mentions #{dead}")
+      linter = Object.new
+      linter.define_singleton_method(:call) { Skills::Result.new([unrelated], nil) }
+      doctor = Skills::Doctor.new(
+        config: config,
+        catalog: catalog,
+        profiles: profiles,
+        projects: projects,
+        linter: linter,
+        home: home
+      )
+      previous = ENV["XDG_STATE_HOME"]
+      ENV["XDG_STATE_HOME"] = home.join("state").to_s
+      begin
+        result = doctor.call(fix: true, apply: true)
+
+        assert_includes result.findings, unrelated
+        refute result.findings.any? { |finding| finding.message.include?("dead skill path") }
+      ensure
+        ENV["XDG_STATE_HOME"] = previous
+      end
+    end
+  end
+
   def test_doctor_reports_and_fix_prunes_with_backup
     with_codex_sandbox do |root, home, config_path|
       File.write(config_path, sample_config(home))
@@ -141,7 +224,12 @@ class CodexConfigTest < Minitest::Test
         assert report.findings.any? { |finding| finding.message.include?("alpha is in the global manifest but disabled in Codex") }
 
         preview = manager.doctor(fix: true)
-        assert_equal({ fix_requested: true, fixed: false }, preview.payload)
+        assert_equal({
+          kind: :doctor,
+          fix_requested: true,
+          fixed: false,
+          planned_codex_paths: ["#{home}/.agents/skills/gone/SKILL.md"]
+        }, preview.payload)
         assert_includes File.read(config_path), "gone/SKILL.md", "fix without --apply must not write"
 
         fixed = manager.doctor(fix: true, apply: true)

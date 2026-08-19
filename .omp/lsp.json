@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "ruby-lsp": {
+      "command": "ruby-lsp",
+      "fileTypes": [".rb"],
+      "languageId": "ruby",
+      "rootMarkers": [".git"]
+    }
+  }
+}

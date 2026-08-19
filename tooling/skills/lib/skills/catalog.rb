@@ -24,6 +24,23 @@ module Skills
       skills.keys.sort
     end
 
+    def structural_findings(names: nil)
+      skills
+      selected = names&.to_set
+      findings = duplicates.filter_map do |name, paths|
+        next if selected && !selected.include?(name)
+
+        Finding.new(:error, "duplicate skill #{name}: #{paths.join(", ")}")
+      end
+      findings.concat(skills.each_value.filter_map do |skill|
+        next if selected && !selected.include?(skill.name)
+
+        skill_identity_findings(skill)
+      end.flatten)
+      findings
+    end
+
+
     private
 
     def discover
@@ -56,10 +73,11 @@ module Skills
     end
 
     def build_skill(path, vendor)
-      metadata = YAML.safe_load(frontmatter(path.join("SKILL.md")), permitted_classes: [], aliases: false) || {}
+      metadata = YAML.safe_load(frontmatter(path.join("SKILL.md")), permitted_classes: [], aliases: false)
+      metadata = {} unless metadata.is_a?(Hash)
       name = path.basename.to_s
       Skill.new(name, path, path.relative_path_from(config.root), vendor, metadata)
-    rescue Psych::SyntaxError => error
+    rescue Psych::Exception
       Skill.new(path.basename.to_s, path, path.relative_path_from(config.root), vendor, {})
     end
 
@@ -72,6 +90,22 @@ module Skills
       end
     end
 
+
+    def skill_identity_findings(skill)
+      text = skill.path.join("SKILL.md").read
+      return [Finding.new(:error, "#{skill.path}: missing YAML frontmatter")] unless text.start_with?("---")
+
+      match = text.match(/\A---\s*\n(.*?)\n---\s*(?:\n|\z)/m)
+      return [Finding.new(:error, "#{skill.path}: unterminated YAML frontmatter")] unless match
+
+      metadata = YAML.safe_load(match[1], permitted_classes: [], aliases: false)
+      return [Finding.new(:error, "#{skill.path}: frontmatter must be a mapping")] unless metadata.is_a?(Hash)
+      return [] if metadata["name"] == skill.name
+
+      [Finding.new(:error, "#{skill.path}: frontmatter name #{metadata["name"].inspect} does not match directory #{skill.name.inspect}")]
+    rescue Psych::Exception => error
+      [Finding.new(:error, "#{skill.path}: invalid YAML frontmatter (#{error.message})")]
+    end
     def frontmatter(path)
       match = path.read.match(/\A---\s*\n(.*?)\n---\s*(?:\n|\z)/m)
       return "{}" unless match

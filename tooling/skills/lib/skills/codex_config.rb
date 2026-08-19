@@ -87,16 +87,15 @@ module Skills
         entry = parse_block(body)
         next unless entry
 
-        if candidates.any? { |candidate| candidate.index == index }
-          drop_ranges << [start, stop]
-          removed_paths << entry["path"]
-          removed_indices << index
-        end
+        next unless candidates.any? { |candidate| candidate.index == index }
+
+        drop_ranges << removable_lines(start, body)
+        removed_paths << entry["path"]
+        removed_indices << index
       end
       pruned = @text.lines.each_with_index
                     .reject { |_line, index| drop_ranges.any? { |start, stop| index >= start && index < stop } }
                     .map(&:first).join
-      pruned = pruned.gsub(/\n{3,}/, "\n\n")
       valid_prune?(pruned, removed_indices) ? [pruned, removed_paths] : [nil, []]
     end
 
@@ -139,6 +138,15 @@ module Skills
       nil
     end
 
+    def removable_lines(start, body)
+      lines = body.lines
+      last_owned_line = lines.each_index.select do |index|
+        index.zero? || lines[index].match?(/^\s*(?:path|enabled)\s*=/)
+      end.max
+      [start, start + last_owned_line + 1]
+    end
+
+
     # The pruned document must equal the original minus exactly the removed
     # entries — nothing else may differ semantically.
     def valid_prune?(pruned, removed_indices)
@@ -148,7 +156,12 @@ module Skills
       return false unless skills.is_a?(Hash)
 
       remaining = Array(skills["config"]).each_with_index.reject { |_entry, index| removed_indices.include?(index) }.map(&:first)
-      skills["config"] = remaining
+      if remaining.empty?
+        skills.delete("config")
+        before.delete("skills") if skills.empty?
+      else
+        skills["config"] = remaining
+      end
       after == before
     rescue TomlRB::ParseError
       false

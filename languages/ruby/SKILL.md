@@ -1,391 +1,252 @@
 ---
 name: ruby
-description: (no description)
-disable-model-invocation: true
+description: Use when creating, repairing, refactoring, or reviewing Ruby scripts, CLIs, gems, or tests. Guides project discovery, Bundler and runtime setup, baseline syntax/tests/quality checks, characterization versus test-first development, proportionate fixture-backed coverage, interpretation of RuboCop and Reek as design signals, and safe CLI verification. Pair with the Ruby program design principles for design conventions.
 ---
 
-# Ruby Code Generation Specification for LLMs
+# Ruby development process
 
-This specification defines comprehensive requirements for generating high-quality, idiomatic Ruby code with appropriate complexity for the problem domain.
+This skill governs **what to do when** during Ruby work. Use the [Ruby program design](ruby-program-design.md) guide for architectural principles; use this skill for sequencing, test strategy, quality checks, and verification.
 
-## Appropriate Complexity
+## Operating stance
 
-### **Proportional Engineering Principle**
-- **Prefer simple, readable solutions** over sophisticated frameworks for straightforward tasks
-- **Abstractions should emerge from actual complexity**, not anticipated complexity
-- **Use advanced patterns when they solve real problems**, not to demonstrate technical capability
+Keep engineering proportional to the script’s risk and expected lifetime.
 
-#### **Avoid Over-Engineering**
-- **Simple file processing**: Basic regex and File operations suffice
-- **One-off utilities**: Hardcoded configuration is often appropriate
-- **Straightforward data transformation**: Built-in enumerable methods are usually sufficient
-- **Scripts with stable requirements**: Don't add flexibility that won't be used
+- Start with the smallest clear design that meets the actual contract.
+- Treat linters, smell detectors, and coverage reports as evidence and design pressure, not as automatic instructions to contort code around a number.
+- When a check reports something, classify it before changing anything:
+  1. **Defect or safety risk** — fix the source code.
+  2. **Useful design pressure** — refactor, or consciously accept the pressure at a documented edge.
+  3. **Representation false positive** — configure the check narrowly or use a local, explained exception.
+  4. **Policy mismatch** — change the project configuration and record why.
+- Never silence a check broadly just to obtain a green run. A green suite is evidence, not proof that the behavior is fully covered.
 
-### **Library Selection Guidelines**
+## Workflow
 
-#### **When to Use dry-rb Libraries**
-- **dry-validation**: Complex business rules, multiple validation contexts, frequently changing data contracts
-- **dry-configurable**: Applications with environment-specific settings, multiple configuration sources
-- **dry-struct**: Complex data modeling with immutability requirements
-- **dry-monads**: Multi-step operations with explicit error handling needs
+Follow these stages in order. Keep the loop short for small changes, but do not skip discovery or baseline verification merely because the script is small.
 
-## Core Architectural Requirements
+### 1. Discover the project before editing
 
-### Class and Module Design
-- **Single Responsibility Principle**: Each class must have one well-defined purpose
-- **Descriptive Naming**: Use names that read like natural language (e.g., `DocumentProcessor`, `analyze_and_categorize`)
-- **Proper Encapsulation**: Use `private` methods for internal implementation details
-- **Dependency Injection**: Accept dependencies through constructor parameters or configuration blocks
+Read the local instructions and project artifacts that determine the workflow:
 
-### Method Structure
-- **Maximum Length**: Keep methods under 10 lines when possible
-- **Guard Clauses**: Use early returns for error conditions to keep main logic unindented
-- **Single Purpose**: Each method should accomplish only one task
-- **Meaningful Names**: Method names should clearly communicate intent and action
+- `AGENTS.md` or equivalent repository guidance;
+- `README.md` and usage examples;
+- `Gemfile`, `Gemfile.lock`, `.ruby-version`, or other runtime declarations;
+- `Rakefile` and existing test/quality configuration;
+- the entrypoint and nearby tests;
+- existing issue or task records when the project uses them.
 
-### **Control Flow and Readability**
+Determine:
 
-#### **Simplify Logic with Guard Clauses**
-Guard clauses aren't just for error handling but for any condition that simplifies the main logic:
+- the supported Ruby version;
+- whether Bundler is required;
+- the existing test framework and naming conventions;
+- how RuboCop, Reek, coverage, and smoke checks are invoked;
+- whether credentials are supplied through a project-specific runtime boundary;
+- whether the command is read-only, writes files, or mutates a remote service.
 
-**Example**:
-```ruby
-# Good: Multiple guard clauses create clear flow
-def process_line(line, next_line)
-  return handle_special_line(line) if special_formatting?(line)
-  return handle_empty_line if line.strip.empty?
+Reuse the project’s existing conventions. Do not introduce RSpec, a new task runner, or a new framework merely because it is familiar.
 
-  handle_content_line(line, next_line)
-end
+### 2. Establish the environment
+
+Use the project’s locked dependencies and runtime. Check the environment before changing code:
+
+```bash
+ruby --version
+bundle check
 ```
 
-#### Avoid Deep Conditional Nesting
-- **Extract complex conditions**: Replace long boolean expressions with well-named predicate methods
-- **Use early returns**: Reduce cognitive load by handling edge cases first
-- **Prefer positive conditions**: `if valid?` reads better than `unless invalid?`
+If dependencies are missing, install them through the project’s normal Bundler workflow and preserve the lockfile. Use `bundle exec` for tests, linters, and project commands whenever the project requires it.
 
-### Method Decomposition
+Do not load secrets into source files, fixtures, command output, or committed environment files. Preserve the project’s explicit secret boundary, such as an `op-env` wrapper, and keep ordinary tests network-free.
 
-#### Functional Decomposition
-- **Single-level abstraction**: Each method should operate at one level of detail
-- **Logical grouping**: Related operations should be grouped into cohesive methods
-- **Progressive refinement**: Start with high-level method names, then implement details
+When planned work depends on an external credential, validate the key early with a read-only probe that prints status codes only, never values. Where a default depends on an external service — model, tier, endpoint — choose it based on measured realistic use.
 
-#### Validation and Input Handling
-- **Explicit validation methods**: Create dedicated `validate_input` methods rather than inline checks
-- **Meaningful error messages**: Include context about what was expected vs. what was received
-- **Fail fast principle**: Validate inputs at method entry points
+When adding a gem, first establish the concrete problem it solves and why the standard library or an existing dependency is no longer clear. Check current documentation, add one capability at a time, update the lockfile, and verify the operational effect.
 
+Consult local sources in this order before guessing: project code, tests, and README for project-specific behavior; installed gem source for dependency behavior; then current official documentation. Prefer documentation matching the project runtime over generic web answers.
 
-## Code Style and Formatting Standards
+### 3. Establish a baseline before editing
 
-### Indentation and Spacing
-- **Two spaces for indentation** throughout all Ruby code (never tabs)
-- **Consistent spacing** around operators, after commas, and around hash arrows
-- **Line length under 80 characters** when feasible for enhanced readability
+Run the narrowest useful baseline checks:
 
-### Naming Conventions
-- **snake_case** for variables and methods
-- **CamelCase** for classes and modules
-- **SCREAMING_SNAKE_CASE** for constants
-- **Descriptive names** that are self-documenting
-
-### Predicate Method Clarity
-- **Question mark methods must return booleans**: Methods ending with `?` should never return lambdas, procs, or other objects
-- **Descriptive predicate names**: Use `special_formatting?` instead of `special_line?` when the method checks formatting
-- **Avoid ambiguous predicates**: If a method name could be interpreted multiple ways, choose the most specific name
-
-### Action Method Naming
-- **Use descriptive action verbs**: `finalize_current_paragraph` reads better than `flush_current_paragraph`
-- **Method names should tell a story**: `process_lines` → `handle_content_line` → `finalize_current_paragraph` creates a narrative flow
-- **Avoid technical jargon**: Choose domain-specific language over implementation details
-
-### Ruby-Specific Idioms
-
-#### String Handling
-- **String interpolation** over concatenation: `"Hello #{name}"` not `"Hello " + name`
-- **Heredocs with squiggly operator** for multi-line strings: ` e` for general exceptions, specific classes when appropriate
-- **Don't mask debugging information** in error handling
-
-### Defensive Programming
-- **Input validation** at method boundaries **proportional to risk**
-- **Nil safety** using safe navigation or explicit checks
-- **Resource cleanup** in ensure blocks when necessary
-
-## Performance and Optimization
-
-### Efficient Ruby Patterns
-- **Memoization** using `||=` operator for expensive operations
-- **Lazy enumerators** for large datasets to minimize memory usage
-- **Object reuse** to minimize allocations in loops
-- **Appropriate data structures** for the use case
-
-### Database and External Resources
-- **Eager loading** to prevent N+1 queries in Rails applications
-- **Connection pooling** for external API calls
-- **Pagination** for large datasets
-- **Caching strategies** for frequently accessed data
-
-## Testing
-
-#### **Behavior-Driven Testing**
-- **Test method names should read like specifications**: `it 'preserves markdown headers when unwrapping paragraphs'`
-- **Test edge cases explicitly**: Empty strings, nil values, malformed input
-- **Test the happy path and error conditions**: Both successful processing and failure scenarios
-
-#### **Integration Testing for CLI Tools**
-- **Test command-line argument parsing**: Verify all option combinations work correctly
-- **Test file I/O operations**: Ensure proper handling of missing files, permissions issues
-- **Test output formatting**: Verify stdout/stderr usage is appropriate
-
-### Test Integration
-- **Write tests alongside code** using RSpec syntax
-- **Include positive and negative test cases**
-- **Mock external dependencies** appropriately
-- **Test edge cases and error conditions**
-
-## Documentation Standards
-
-- **RDoc format** for class and method documentation
-- **Meaningful comments** that explain "why" not "what"
-- **Usage examples** in documentation for complex methods
-- **README files** with clear setup and usage instructions
-
-### Document Method Intent
-- **Explain the "why"**: Document the business logic or algorithm reasoning
-- **Include examples**: Show typical input/output for complex methods
-- **Document edge cases**: Explain how the method handles unusual inputs
-
-### Document Class Responsibility
-- **Clear purpose statement**: One sentence describing what the class does
-- **Usage examples**: Show typical instantiation and method calling patterns
-- **Dependencies**: Document what external resources or services the class requires
-
-### Explain Algorithms and Business Logic
-Comments should explain complex algorithms, business rules, or non-obvious implementation decisions.
-
-**Example**:
-```ruby
-class DocumentProcessor
-  # Uses a state machine approach to handle paragraph boundaries
-  # because simple line-by-line processing fails with markdown mixed content
-  def process_lines(lines)
-    lines.each_with_index { |line, index| process_line(line, lines[index + 1]) }
-  end
-
-  private
-
-  # Markdown headers can appear mid-paragraph in some documents,
-  # so we need to check both current line formatting and next line context
-  def paragraph_break?(line, next_line = nil)
-    line_ends_paragraph?(line) || next_line_starts_new_section?(next_line)
-  end
-end
+```bash
+ruby -c path/to/changed_file.rb
+bundle exec ruby -Itest path/to/test_file.rb
 ```
 
-### Explain Domain-Specific Context
-Explain domain knowledge that might not be obvious to future maintainers.
+Then run the project’s configured quality task if one exists, for example:
 
-**Example**:
-```ruby
-# Validates addresses against RFC 5322, but relaxes a few rules to accept
-# quirks present in legacy customer data (e.g., quoted local parts, unquoted
-# dots). A stricter parser would reject ~3% of our paying customers' records.
-class EmailValidator
-  def valid?(email)
-    return false if email.nil? || email.strip.empty?
-
-    local_part, _, domain = email.partition('@')
-    return false if local_part.empty? || domain.empty?
-
-    valid_local_part?(local_part) && valid_domain?(domain)
-  end
-
-  private
-
-  # RFC 5322 permits quoted local parts ("john..doe"@example.com) that look
-  # invalid at a glance; legacy imports rely on them, so we keep them allowed.
-  def valid_local_part?(local_part)
-    return true if local_part.start_with?('"') && local_part.end_with?('"')
-
-    local_part.match?(/\A[a-zA-Z0-9._%+-]+\z/)
-  end
-
-  def valid_domain?(domain)
-    domain.match?(/\A[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\z/)
-  end
-end
+```bash
+rake quality
 ```
 
-## Code Quality and Maintainability
+Record which failures predate the change. Distinguish parser failures, failing behavior tests, quality findings, missing dependencies, and missing credentials. Do not treat a pre-existing failure as evidence that the proposed change caused it.
 
-### DRY Principle
-- **Extract repeated code** into methods or modules
-- **Use constants** for repeated values
-- **Create shared modules** for common functionality
-- **Avoid copy-paste programming**
+For a reported bug, reproduce it before editing. For an existing script being refactored, capture representative behavior before rearranging the implementation.
 
-### Complexity Management
-- **Limit nesting** to maximum of two levels in conditionals/loops
-- **Break complex methods** into smaller, focused methods
-- **Use meaningful variable names** to reduce cognitive load
-- **Prefer composition over inheritance** when appropriate
+### 4. Define the observable contract
 
-## Modern Ruby Features and Best Practices
+Before choosing tests or abstractions, write down the behavior that matters:
 
-### Language Features
-- **Pattern matching** (Ruby 3.0+) when it improves clarity
-- **Keyword arguments** for methods with multiple parameters
-- **Block syntax** over method references when it improves readability
-- **Struct classes** for simple data containers
+- inputs and option combinations;
+- outputs, files, records, or remote calls;
+- stdout, stderr, and exit statuses;
+- safe defaults and explicitly dangerous operations;
+- authentication and failure behavior;
+- ordering, naming, idempotency, and rerun expectations;
+- dry-run versus check versus apply semantics, where applicable.
 
-### Standard Library Usage
-- **FileUtils** for file operations instead of shell commands
-- **Pathname** for cross-platform path manipulation
-- **ENV** for environment variable access
-- **JSON/YAML** libraries for data serialization
+Separate external effects from deterministic decisions where the boundary is real. Typical boundaries are:
 
-## Security Considerations
-
-### Input Validation
-- **Sanitize user inputs** to prevent injection attacks
-- **Use strong parameters** in Rails applications
-- **Validate data types** and ranges
-- **Escape output** when rendering user content
-
-### Authentication and Authorization
-- **Secure session management**
-- **Proper password handling** with bcrypt
-- **CSRF protection** in web applications
-- **Secure API key management**
-
-## Framework-Specific Guidelines
-
-### Rails Applications
-- **Follow Rails conventions** for file organization and naming
-- **Use Rails helpers** and built-in functionality
-- **Implement proper MVC separation**
-- **Use Rails generators** appropriately
-
-### Gem Development
-- **Follow semantic versioning**
-- **Include proper gemspec** with dependencies
-- **Provide comprehensive documentation**
-- **Include executable scripts** when appropriate
-
-## Code Analysis and Quality Assurance
-
-### Static Analysis
-- **RuboCop compliance** without violations
-- **Follow Ruby Style Guide** community standards
-- **Use Reek** for code smell detection
-- **Implement SimpleCov** for test coverage
-
-### Code Review Preparation
-- **Structure commits logically** for easy review
-- **Write descriptive commit messages**
-- **Keep changes focused** and atomic
-- **Include tests** with code changes
-
-## Configuration and Environment Management
-
-### Configuration Patterns
-- **Use configuration blocks** with yielded objects
-- **Environment-specific settings** in separate files
-- **Secure credential management**
-- **Default values** for optional configuration
-
-### Deployment Considerations
-- **Include necessary dependencies** in Gemfile
-- **Environment variable documentation**
-- **Database migration scripts** when applicable
-- **Health check endpoints** for web applications
-
-## Example Implementation Pattern
-
-```ruby
-# Good: Demonstrates multiple specification requirements
-class DocumentProcessor
-  def initialize(source_path = default_source_path)
-    @source_path = source_path
-    validate_source_path!
-  end
-
-  def process_documents
-    documents = load_documents
-    results = documents.map { |doc| analyze_document(doc) }
-    save_results(results)
-
-  rescue ProcessingError => e
-    handle_processing_error(e)
-  end
-
-  private
-
-  def validate_source_path!
-    return if @source_path && Dir.exist?(@source_path)
-
-    raise ArgumentError, "Invalid source path: #{@source_path}"
-  end
-
-  def analyze_document(document)
-    return fallback_analysis(document) unless document.readable?
-
-    perform_analysis(document)
-  end
-
-  def default_source_path
-    ENV.fetch('DOCUMENT_PATH', './documents')
-  end
-end
+```text
+CLI parsing → use-case selection → API/filesystem adapters → normalized data → pure transformation
 ```
 
-### Anti-Patterns to Avoid
+Do not split files merely because they are long. Split when a component has a distinct reason to change or can be tested independently.
 
-#### Don't return lambdas from predicate methods
+For state-changing work, plan before applying:
 
-**Example**:
 ```ruby
-# Bad: Confusing interface
-def special_line?
-  ->(line) { line.start_with?('#') }
-end
-
-# Good: Clear boolean return
-def special_line?(line)
-  line.start_with?('#')
-end
+plan = runner.plan(options)
+report(plan)
+runner.apply(plan) unless options[:dry_run]
 ```
 
-#### Don't duplicate code in conditionals
-- **Extract shared logic**: When similar conditions appear in multiple methods, create shared helper methods
-- **Use consistent patterns**: If checking for special formatting in one place, use the same logic everywhere
-- **Create domain-specific predicates**: `markdown_header?`, `list_item?`, `paragraph_ending?`
+A dry run must use the real planning logic and must not write files, create directories, or call mutation endpoints.
 
+### 5. Choose the test strategy deliberately
 
-## Quality Checklist
+Use the strategy that matches the code’s history and the change’s intent.
 
-Before considering Ruby code complete, verify:
+#### Existing behavior or legacy code: characterize first
 
-- [ ] Complexity is proportional to problem domain
-- [ ] All public methods have clear, descriptive names
-- [ ] Private methods are used appropriately for internal logic
-- [ ] Error handling includes meaningful messages and fallback strategies
-- [ ] Code follows DRY principle without over-abstraction
-- [ ] Tests cover both happy path and edge cases
-- [ ] Documentation explains complex logic and usage
-- [ ] RuboCop passes without violations
-- [ ] Method length stays under 10 lines where possible
-- [ ] Nesting depth remains under 2 levels
-- [ ] String interpolation is used instead of concatenation
-- [ ] Advanced libraries are used only when they solve real problems
-- [ ] Method names read like natural English sentences
-- [ ] Predicate methods (ending with `?`) return only boolean values
-- [ ] Complex conditions are extracted into well-named predicate methods
-- [ ] Guard clauses are used to simplify main logic flow
-- [ ] Input validation occurs at method entry points with meaningful error messages
-- [ ] No code duplication exists between similar conditional checks
-- [ ] Each method operates at a single level of abstraction
-- [ ] Class and method documentation explains intent, not just implementation
-- [ ] Tests cover both typical usage and edge cases
-- [ ] CLI tools properly handle argument parsing and file I/O errors
+When the implementation already exists, write characterization tests before refactoring it. Capture the behavior that must not change, even if the current behavior may later be questioned. Then refactor behind those tests.
+
+These tests are not a failure of test-driven development; they are the correct way to create a safety net around behavior that already exists.
+
+#### New behavior or policy: test first
+
+For a new option, selection rule, output contract, validation rule, pagination policy, or error behavior:
+
+1. Write a failing test describing the observable scenario and expected result.
+2. Implement the smallest change that makes it pass.
+3. Refactor while keeping the test green.
+4. Add boundary and failure cases when the policy is stable.
+
+#### Pure refactoring: preserve first, then simplify
+
+Run the existing tests before changing structure. Do not add speculative abstractions or tests that assert private implementation details. Add a test only when the refactor reveals an unprotected observable contract.
+
+#### Exploratory one-off work
+
+For a disposable experiment, a small implementation-first slice can be reasonable. Before promoting it into a maintained script, capture the contract, add proportionate tests, and establish the normal quality command.
+
+### 6. Build proportionate coverage
+
+Do not optimize for a universal percentage. Cover risks and contracts instead of every line or helper method.
+
+For a small Ruby CLI, the normal baseline is:
+
+| Area | Proportionate coverage |
+| --- | --- |
+| Pure transformation | One representative output plus meaningful empty, missing, or malformed input where relevant |
+| Selection and validation | Each important policy branch and its invalid/error case |
+| External adapter | Fixture-backed responses for pagination, missing fields, and important failures |
+| Filesystem effects | A temporary-directory test for created or changed artifacts; rerun/idempotency if promised |
+| CLI behavior | Help, safe defaults, important option combinations, stdout/stderr, and exit status |
+| Destructive or remote behavior | Plan/dry-run behavior separately from apply; live tests gated and explicit |
+
+Use behavior-oriented assertions. A rendered-document test may assert several sections when they are all part of one output contract; split it only when a failure would otherwise be hard to interpret.
+
+Avoid:
+
+- a test for every trivial private helper;
+- tests that only prove a mock was called;
+- broad mocks that reproduce the implementation instead of the external contract;
+- network access or credentials in ordinary tests;
+- adding a live end-to-end test when a deterministic fixture tests the same decision;
+- adding tests solely to satisfy an arbitrary coverage percentage.
+
+Prefer small fakes or fixture-backed adapters over long mock setups. If a constructor reads the environment and creates a network client, separate those concerns so tests can inject a fake transport without requiring a credential:
+
+```ruby
+Client.from_environment       # production boundary
+Client.new(graphql_client: fake) # deterministic test boundary
+```
+
+Verify what a fake promises against the real dependency's API — installed gem source or current documentation — before writing assertions against it.
+
+For GraphQL or other protocol clients, fixtures should exercise the adapter's real pagination and normalization logic. If the client library parses or validates queries, supply a local schema fixture so the offline suite still catches contract drift such as a mistyped field name. Stub the transport rather than the client library, route responses by operation, and record requests so cursor follow-ups can be asserted. Expect the library to transform what crosses the boundary — stringified variable keys, renamed operations; a hanging pagination test usually means the stubbed pages never terminate. Keep an optional live smoke test outside the default suite and run it through the project's explicit credential boundary.
+
+### 7. Implement in small verified steps
+
+For each behavior change:
+
+1. change the test or contract first when using test-first development;
+2. make the smallest source change;
+3. run the focused test;
+4. inspect the output and failure message;
+5. refactor only after behavior is green.
+
+Keep network calls, environment reads, timestamps, and file writes at the edges. Pass dependencies explicitly when that creates a genuine testing or composition seam; do not introduce a container or framework to avoid passing a small number of dependencies.
+
+After a structural code change, run the project’s required Reek/RuboCop/tests before continuing. Do not let a formatting or smell pass become the design objective.
+
+### 8. Interpret quality checks as design review
+
+Run the project’s configured checks in their intended order. Then review the findings rather than applying automatic fixes blindly.
+
+#### RuboCop
+
+Use complexity thresholds as budgets for behavioral complexity. Keep them strict for control flow. If a method is mostly a declarative hash, array, or heredoc, prefer `CountAsOne` configuration over globally raising thresholds. If a schema projection remains above ABC because the metric counts fields as assignments, use meaningful extraction or a narrowly scoped suppression with a reason. Prefer the narrowest scope that covers the finding — a directive around a single method or signature, closed on the next line — over file-wide disables.
+
+Always close local `rubocop:disable` directives. A missing `rubocop:enable` can hide unrelated offenses later in the file.
+
+#### Reek
+
+Keep detectors enabled when they expose a real design risk. Disable a detector only for a recurring, documented boundary pattern, such as nullable API data or deliberately small formatting helpers. Use the narrowest scope that fixes the finding: an inline directive on the affected method beats disabling the detector project-wide. Re-enable detectors that become useful as the design changes.
+
+A class at the configured edge is valuable. Do not split a cohesive class merely to avoid a warning; either accept the documented edge or split when the responsibilities have genuinely diverged. Conversely, do not raise every threshold until the warning disappears.
+
+#### Check conflicts
+
+When tools disagree, choose the clearest project policy and configure it explicitly. For example, if one tool prefers a short conventional rescue variable and another prefers a descriptive name, set the preferred name rather than changing good code back and forth.
+
+### 9. Exercise the command, not only its tests
+
+Before declaring a CLI complete, run the real bundled command through safe paths:
+
+- `--help`;
+- no-argument or safe-default behavior;
+- a fixture or temporary-directory export;
+- invalid input and missing-credential behavior;
+- dry-run behavior, if supported.
+
+Check the command's own exit status — not one observed through a pipe or a later command — plus stdout, stderr, file layout, stable names, and the absence of secrets in output. Run a live remote operation only when the user’s explicit runtime credential boundary is available and the operation is safe and intended.
+
+### 10. Finish the project-facing work
+
+Before delivering:
+
+- run the complete configured quality/test command;
+- verify all affected callers, tests, and documentation;
+- update README usage when command behavior or setup changed;
+- record dependency or operational decisions where maintainers will need them;
+- remove temporary fixtures, debug output, and scaffolding;
+- report exactly what was exercised and what was not, especially live API paths.
+
+## Completion checklist
+
+A Ruby script or CLI is ready when:
+
+- its purpose, inputs, effects, and exit behavior are explicit;
+- the project’s runtime and Bundler environment are reproducible;
+- ordinary tests require no network or secret;
+- existing behavior is characterized before risky refactors;
+- new behavior was developed test-first where that clarified the contract;
+- tests cover the important normal, boundary, error, external, and side-effect paths proportionately;
+- external services are behind small testable adapters;
+- quality findings were classified and handled deliberately;
+- quality thresholds and local exceptions have reasons;
+- the actual command was smoke-tested through safe paths;
+- the README and final evidence are truthful.

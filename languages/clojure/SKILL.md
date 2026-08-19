@@ -1,1102 +1,266 @@
 ---
 name: clojure
-description: (no description)
-disable-model-invocation: true
+description: Use when creating, repairing, refactoring, reviewing, or exploring Clojure code, EDN data models, dataflow pipelines, REPL-driven workflows, or Clojure orchestration of JVM systems. Guides project discovery, deps.edn and REPL setup, baseline lint/test/evaluation checks, characterization versus REPL-first development, proportionate schema and pipeline coverage, interpretation of clj-kondo as design signals, Java/Kotlin interop verification, and agent-REPL interaction discipline. Pair with the Clojure program design principles for design conventions.
 ---
 
-# Clojure/Babashka Development: REPL-Driven HTDP Best Practices
+# Clojure development process
 
-A practical guide for building reliable, maintainable scripts using Clojure and Babashka, incorporating lessons learned from development experiences.
+This skill governs **what to do when** during Clojure work. Use the Clojure program design guide for architectural principles; use this skill for sequencing, REPL discipline, test strategy, quality checks, and verification.
 
----
+The normal context is inspection, orchestration, reflection, and dataflow—often composing or exploring systems implemented in other JVM languages. The REPL is the primary working environment. Keep the process proportional: a scratch exploration does not need a test suite, but anything promoted to a maintained namespace needs a truthful verification loop.
 
-## Core Philosophy: REPL-Driven HTDP Development
+## Operating stance
 
-**Why This Approach?**
-- Immediate feedback via REPL testing
-- Systematic function design prevents bugs
-- Single-file scripts reduce complexity
-- Validation-first prevents runtime errors
+Keep engineering proportional to the work's risk and expected lifetime.
 
----
+- Start with data and the smallest set of functions that transform it.
+- Treat clj-kondo findings, test failures, reflection warnings, and unexpected REPL results as evidence and design pressure, not as automatic instructions.
+- When a check reports something, classify it before changing anything:
+  1. **Defect or safety risk** — fix the source code.
+  2. **Useful design pressure** — refactor, or consciously accept the pressure at a documented boundary.
+  3. **False positive** — configure the check narrowly or use a local, explained exception.
+  4. **Policy mismatch** — change the project configuration and record why.
+- Never silence a check broadly just to obtain a green run. A clean lint pass is evidence, not proof that the dataflow is correct.
+- The REPL is the first line of verification; tests are the durable record. Both matter; neither replaces the other.
 
-## 1. HTDP (How to Design Programs) Methodology
+## Workflow
 
-### The HTDP Design Recipe
+Follow these stages in order. Keep the loop short for small explorations, but do not skip discovery or baseline verification merely because the change is small.
 
-For **every function**, follow this systematic process:
+### 1. Discover the project before editing
 
-#### Step 1: Data Definitions
-Define your data structures explicitly:
+Read the local instructions and project artifacts that determine the workflow:
 
-```clojure
-;; Examples:
-;; A CSV-Field is a String
-;; A CSV-Row is a Map<String, String>
-;; A Markdown-Metadata is a Map<Keyword, (String | [String] | :empty)>
-;; A File-Path is a String ending in ".md"
-```
+- `AGENTS.md` or equivalent repository guidance;
+- `README.md`, examples, and any existing `comment` forms that document exploration;
+- `deps.edn` (aliases, dependencies, paths) or the project's build configuration;
+- existing schema definitions (Malli, spec) and EDN fixtures;
+- the namespaces near the intended change and their tests;
+- existing issue or task records when the project uses them.
 
-#### Step 2: Function Signature
-```clojure
-;; Name: Input-Type -> Output-Type
-;; Examples:
-;; parse-csv-line: String -> [String]
-;; transform-row: CSV-Row -> Markdown-Metadata
-;; sanitize-filename: String -> File-Path
-```
+Determine:
 
-#### Step 3: Purpose Statement
-One sentence describing what the function computes:
+- the supported Clojure and JVM versions;
+- how the REPL is started (which alias, which port, which middleware);
+- how tests, linting, and formatting are invoked;
+- whether the work is exploration, orchestration, interop, or pipeline construction;
+- whether the change touches boundary schemas, run models, or interop wrappers;
+- whether an agent will be driving the REPL, and through which connection.
 
-```clojure
-;; Purpose: Parses a single CSV line into a vector of field strings
-```
+Reuse the project's existing conventions. Do not introduce a new build tool, test runner, or schema library merely because it is familiar.
 
-#### Step 4: Examples (Test Cases)
-Write examples **before** implementing:
+### 2. Establish the environment
 
-```clojure
-;; Examples:
-;; (parse-csv-line "A;B;C") => ["A" "B" "C"]
-;; (parse-csv-line "\"A\";\"B;C\"") => ["A" "B;C"]
-;; (parse-csv-line "") => [""]
-```
-
-#### Step 5: Template
-Based on input data structure:
-
-```clojure
-;; For String input (character-by-character processing):
-(defn parse-csv-line [line]
-  (loop [chars (vec line)
-         result []
-         ...]
-    ;; ... process each character
-    ))
-```
-
-#### Step 6: Implementation
-Write the function body:
-
-```clojure
-(defn parse-csv-line
-  "Parse a single CSV line into fields"
-  [line]
-  (loop [chars (vec line)
-         result []
-         current-field ""
-         in-quotes false]
-    ;; ... implementation ...
-    ))
-```
-
-#### HTDP Comments in Code
-
-Document HTDP steps as comments for self-documenting code:
-
-```clojure
-;; HTDP Recipe for parse-csv-line
-
-;; Step 2: Function Signature
-;; parse-csv-line: String -> [String]
-
-;; Step 3: Purpose Statement
-;; Purpose: Parse a single CSV line into fields with semicolon delimiter
-
-;; Step 4: Examples (from implementation plan)
-;; (parse-csv-line "A;B;C") => ["A" "B" "C"]
-;; (parse-csv-line "\"A\";\"B;C\"") => ["A" "B;C"]
-
-;; Step 5: Template
-;; Based on String input - character-by-character processing
-
-;; Step 6: Implementation
-(defn parse-csv-line [...] ...)
-
-;; Test the function
-(println "Test result:" (parse-csv-line "A;B;C"))
-```
-
-**Benefits:**
-- Documents intent alongside code
-- Makes code self-explanatory for future maintainers
-- Helps trace back to design decisions
-- Great for code reviews
-
-### What If a Test Fails?
-
-**Critical section - real debugging example:**
-
-```clojure
-;; Test third example (first attempt - had a bug)
-(parse-csv-line "\"ABC\";;\"\"")
-;; Returns: ["ABC" ""]
-;; Expected: ["ABC" "" ""]
-;; BUG! Missing the last empty field
-
-;; What to do:
-;; 1. Describe the problem: "It's missing the last empty field"
-;; 2. Check the code: I'm not adding the final field when loop ends
-;; 3. Fix the implementation:
-;;    Change base case from `result` to `(conj result current)`
-;; 4. Test again:
-(parse-csv-line "\"ABC;;\"\"")
-;; Returns: ["ABC" "" ""]  ✓ Fixed!
-
-;; Key lesson: Tests catch bugs immediately. If I didn't have examples,
-;; I might not have caught this edge case.
-```
-
-**Debugging workflow:**
-1. Describe the problem in plain English
-2. Check the code against your examples
-3. Trace through the logic step by step
-4. Fix the implementation
-5. Test again with all examples
-
-**Why this matters:** Without examples, you might never test the edge case that fails. With examples, you know exactly what's broken and can fix it immediately.
-
----
-
-## 2. REPL-Driven Development Workflow
-
-### Always Start in REPL
-
-**Never write a long script without testing each piece!**
-
-#### REPL Workflow - Three Practical Approaches:
-
-**Option A: Interactive REPL (for rapid iteration)**
-```bash
-# Start REPL
-bb
-
-# Test each function individually
-user=> (parse-csv-line "A;B;C")
-["A" "B" "C"]  ✓
-
-# If error, fix immediately
-# If correct, continue to next function
-```
-
-**Option B: One-liner testing (for quick checks)**
-```bash
-# Test a single expression
-bb -e '(parse-csv-line "A;B;C")'
-
-# Test multiple expressions
-bb -e '
-(load-file "functions.clj")
-(parse-csv-line "A;B;C")
-'
-```
-
-**Option C: Test file (for complex tests)**
-```clojure
-;; test_functions.clj
-(defn parse-csv-line [...] ...)
-;; Run tests
-(parse-csv-line "A;B;C")
-(parse-csv-line "\"A\";\"B;C\"")
-
-;; Execute
-bb test_functions.clj
-```
-
-#### Build Scripts Incrementally
-
-**Single-File Scripts for Babashka:**
-- Prefer one concern per file
-- Pure functions first, then I/O
-- Consider the 200-line limit as a guideline, not a hard rule
-- Scripts can be 300-500 lines if well-organized with clear sections
-- Consider multiple files if approaching 1000 lines
-
-**Better guideline:** One function per concern, clear section headers, comprehensive comments
-
-### Incremental Testing with Separate Files
-
-**When to use this approach:**
-- For scripts with 10+ functions
-- When building complex transformations
-- To keep a development history/audit trail
-- When working in environments where interactive REPL is less convenient
-
-**Pattern:**
-```clojure
-;; test_parse_csv_line.clj
-(defn parse-csv-line [...] ...)
-;; Test immediately
-(println "Test 1:" (parse-csv-line "A;B;C"))
-(println "Test 2:" (parse-csv-line "\"A\";\"B;C\""))
-
-;; Run
-bb test_parse_csv_line.clj
-```
-
-**Benefits:**
-- Each function can be tested independently
-- Build complexity incrementally
-- Easy to revert/fix individual functions
-- Clear development progression
-- Great for code reviews - each function has its own test history
-
-**Workflow:**
-1. Create `test_parse_csv_line.clj` → Test → ✓
-2. Create `test_parse_csv_header.clj` (loads previous) → Test → ✓
-3. Create `test_parse_csv.clj` (loads previous) → Test → ✓
-4. ...continue building
-5. Finally assemble into single file
-
----
-
-## 3. Single-File Script Architecture
-
-### For Simple Scripts (like CSV converters):
-
-```clojure
-#!/usr/bin/env bb
-
-;; 1. DATA DEFINITIONS
-;; A CSV-Row is {:name String :definition String ...}
-
-;; 2. VALIDATION SCHEMAS (Malli or Manual)
-;; (see Section 4 for both approaches)
-
-;; 3. PURE FUNCTIONS (test first in REPL)
-(defn parse-csv-line [line] ...)
-(defn parse-csv [path] ...)
-(defn transform-row [row] ...)
-(defn generate-yaml [data] ...)
-(defn generate-markdown [data] ...)
-
-;; 4. MAIN (imperative shell)
-(defn -main []
-  ;; Parse CLI args
-  ;; Read CSV
-  ;; Transform rows
-  ;; Write files
-  )
-
-;; ENTRY POINT
-(apply -main *command-line-args*)
-```
-
----
-
-## 4. Validation Strategies
-
-### Why Validate?
-- Catch errors early at function boundaries
-- Document expected data structures
-- Prevent downstream errors
-
-### Option A: Validation with Malli
-
-**Schema-First Design:**
-
-```clojure
-;; Define schemas for all data
-(require '[malli.core :as m])
-
-(def CSV-Row-Schema
-  [:map
-   [:name :string]
-   [:definition :string]
-   [:status :string]])
-
-(def Markdown-Metadata-Schema
-  [:map
-   [:created :string]
-   [:name :string]
-   [:definition :string]])
-
-;; Validation function
-(defn validate-csv-row [row]
-  (if (m/validate CSV-Row-Schema row)
-    row
-    (throw (ex-info "Invalid CSV row" {:row row :errors (m/explain CSV-Row-Schema row)}))))
-```
-
-**Use Validation:**
-```clojure
-(defn transform-row [row]
-  (let [validated (validate-csv-row row)]
-    ;; transform validated data
-    ))
-```
-
-### Option B: Manual Validation (When Malli Isn't Available)
-
-**When to use:** Malli not installed, or simple validation is clearer
-
-```clojure
-(defn validate-csv-row
-  "Validate CSV row has required fields"
-  [row]
-  (let [required [:name :definition :lastmodifiedon :createdon]
-        missing (filter #(clojure.string/blank? (get row % "")) required)]
-    (when (seq missing)
-      (throw (ex-info (str "Missing required fields: " missing) {:row row})))
-    row))
-
-;; Test validation
-(def valid-row {:name "Test" :definition "Sample" :lastmodifiedon "2025-01-01" :createdon "2024-01-01"})
-(validate-csv-row valid-row)  ;; => returns row
-
-(def invalid-row {:name "Test" :definition ""})
-(validate-csv-row invalid-row)  ;; => throws exception
-```
-
-**Also document Malli schemas for reference (even if not using them):**
-```clojure
-(comment
-  ;; These schemas document expected structure even if using manual validation
-  (def CSV-Row-Schema
-    [:map
-     [:name :string]
-     [:definition :string]
-     [:lastmodifiedon :string]
-     [:createdon :string]])
-
-  (def Markdown-Metadata-Schema
-    [:map
-     [:created :string]
-     [:name :string]
-     [:definition :string]]))
-```
-
----
-
-## 5. Testing Strategy
-
-### Test Each Function in REPL
-
-**Example-driven testing:**
-
-```clojure
-;; Test parse-csv-line
-(parse-csv-line "A;B;C")
-;; Expected: ["A" "B" "C"]
-
-(parse-csv-line "\"A\";\"B;C\"")
-;; Expected: ["A" "B;C"]
-
-;; Test transform-row
-(let [row {:name "Test" :definition "Def"}
-      result (transform-row row)]
-  (assert (= (:name result) "Test"))
-  (assert (= (:created result) "2025-11-03T10:00:00Z")))
-;; All assertions pass ✓
-```
-
-### Fixture-Based Testing
-
-```clojure
-;; test/fixtures/sample.csv
-"Name";"Definition"
-"Test";"Sample definition"
-
-;; In REPL:
-(let [rows (parse-csv "test/fixtures/sample.csv")]
-  (assert (= (count rows) 1))
-  (assert (= (:name (first rows)) "Test")))
-```
-
-### Real-World Testing
-
-**Always test with actual data (after synthetic tests):**
-
-```clojure
-;; After testing with synthetic data:
-(def real-data (slurp "production-data.csv"))
-(def rows (parse-csv real-data))
-
-;; Process first few rows
-(println "Real data row count:" (count rows))
-(doseq [row (take 5 rows)]
-  (process-csv-row row "."))
-
-;; Check generated output
-(println "Sample generated file:")
-(println (slurp "generated-file.md"))
-```
-
-**Why this matters:**
-- Real data often has edge cases synthetic data misses
-- Different CSV formats, encodings, line endings
-- Performance testing with actual data volumes
-- Validation with production constraints
-
----
-
-## 6. Common Patterns & Templates
-
-### CSV Parsing Template
-
-```clojure
-(defn parse-csv-line
-  "Parse CSV line with semicolon delimiter"
-  [line delimiter]
-  (loop [chars (vec line)
-         result []
-         current ""
-         in-quotes false]
-    (if (empty? chars)
-      (conj result current)
-      (let [c (first chars)
-            rest (rest chars)]
-        (cond
-          ;; Handle quotes
-          (and in-quotes (= c \"))
-          (if (= (first rest) \")
-            (recur (rest rest) result (str current \") in-quotes)
-            (recur rest result current false))
-
-          ;; Handle delimiter
-          (and (not in-quotes) (= c delimiter))
-          (recur rest (conj result current) "" in-quotes)
-
-          ;; Regular character
-          :else
-          (recur rest result (str current c) in-quotes))))))
-```
-
-### Field Name Transformation Pattern
-
-**Common when mapping between data sources:**
-
-```clojure
-(defn transform-row-to-metadata
-  "Transform CSV row to markdown metadata"
-  [row]
-  {:name (:name row)
-   ;; Map different field names
-   :data-type (:conceptual-data-type row)      ;; :conceptual-data-type -> :data-type
-   :data-asset (:az-data-asset row)           ;; :az-data-asset -> :data-asset
-   :modified-on (:lastmodifiedon row)         ;; :lastmodifiedon -> :modified-on
-   :created-on (:createdon row)               ;; :createdon -> :created-on
-   ;; Direct mappings
-   :definition (:definition row)
-   :criticality-indicator (:criticality-indicator row)
-   :data-domain (:data-domain row)
-   :status (:status row)
-   :asset-type (:asset-type row)})
-
-;; Document field mappings at top of function or file:
-;; CSV Fields → Markdown Fields
-;; :conceptual-data-type → :data-type
-;; :az-data-asset → :data-asset
-;; :lastmodifiedon → :modified-on
-;; :createdon → :created-on
-```
-
----
-
-## 7. Error Handling
-
-### Fail Fast at Boundaries
-
-```clojure
-(defn -main []
-  (try
-    (let [args (parse-cli-args *command-line-args*)
-          input (:input args)]
-
-      ;; Validate input file exists
-      (when-not (clojure.java.io/exists? (clojure.java.io/file input))
-        (println "Error: File not found:" input)
-        (System/exit 1))
-
-      ;; Validate CSV structure
-      (let [rows (parse-csv input)]
-        (when (empty? rows)
-          (println "Error: CSV is empty or has no data rows")
-          (System/exit 1))
-
-        ;; Process with confidence
-        (process-rows rows)))
-
-    (catch Exception e
-      (println "Error:" (.getMessage e))
-      (.printStackTrace e)
-      (System/exit 1))))
-```
-
-### Common Error Patterns & Solutions
-
-#### Error 1: Entry Point Arguments
-**Problem:** `(-main)` doesn't receive command-line args
-```clojure
-;; WRONG
-(-main)
-;; Correct output: Error: No input file...
-
-;; RIGHT
-(apply -main *command-line-args*)
-;; Correct output: Processes actual arguments
-```
-
-#### Error 2: Empty CSV Handling
-```clojure
-(let [rows (parse-csv csv-content)]
-  (when (empty? rows)
-    (println "Error: CSV has no data rows")
-    (System/exit 1)))
-```
-
-#### Error 3: File Not Found
-```clojure
-(when-not (.exists (java.io.File. input-file))
-  (println "Error: File not found:" input-file)
-  (System/exit 1))
-```
-
-#### Error 4: Processing Individual Rows
-```clojure
-(defn process-csv-row
-  "Process single row with error isolation"
-  [row output-dir]
-  (try
-    ;; ... transformation logic that might fail
-    (validate-csv-row row)
-    (let [metadata (transform-row-to-metadata row)]
-      ;; ... more processing
-      )
-    (catch Exception e
-      (println "Error processing row:" (.getMessage e))
-      ;; Continue with next row instead of failing entire process
-      )))
-```
-
-#### Error 5: Argument Parsing Indexing
-```clojure
-;; WRONG - using 'second' on rest
-(recur (rest args) (assoc result :input (second args)))
-
-;; RIGHT - using 'first' on rest
-(recur (vec (rest rest-args)) (assoc result :input (first rest-args)))
-```
-
----
-
-## 8. CLI Design for Scripts
-
-### Flexible Argument Parsing
-
-**Support multiple argument styles:**
-
-```clojure
-(defn parse-cli-args
-  "Parse command line arguments"
-  [args]
-  (loop [args (vec args) result {}]
-    (if (empty? args) result
-      (let [arg (first args) rest-args (rest args)]
-        (cond
-          ;; Flag style
-          (or (= arg "-i") (= arg "--input"))
-          (if (seq rest-args)
-            (recur (vec (rest rest-args)) (assoc result :input (first rest-args)))
-            (recur rest-args result))
-
-          ;; Help flag
-          (or (= arg "-h") (= arg "--help"))
-          (recur rest-args (assoc result :help true))
-
-          ;; Positional argument (CSV file)
-          (and (not (contains? result :input))
-               (clojure.string/ends-with? arg ".csv"))
-          (recur rest-args (assoc result :input arg))
-
-          :else
-          (recur rest-args result))))))
-
-;; Usage:
-;; ./script.clj data.csv                    (positional)
-;; ./script.clj -i data.csv                 (flag)
-;; ./script.clj --input data.csv            (long flag)
-;; ./script.clj --help                      (help)
-```
-
-### Simple Argument Parsing (Alternative)
-
-```clojure
-(defn parse-args [args]
-  (loop [args args
-         result {}]
-    (if (empty? args)
-      result
-      (let [arg (first args)]
-        (cond
-          (or (= arg "-i") (= arg "--input"))
-          (recur (rest args) (assoc result :input (second args)))
-
-          (or (= arg "-h") (= arg "--help"))
-          (recur (rest args) (assoc result :help true))
-
-          :else
-          (recur (rest args) result))))))
-```
-
----
-
-## 9. Common Pitfalls & Solutions
-
-### Pitfall: Writing Long Scripts First
-**Problem:** 100+ lines without testing
-**Solution:** Build in REPL, one function at a time
-
-### Pitfall: Complex Nested Forms
-**Problem:** Deep `cond`/`let` blocks
-**Solution:** Break into smaller functions
-
-### Pitfall: String vs Keyword Confusion
-**Problem:** CSV has strings, code uses keywords
-**Solution:** Explicit data definitions + validation schemas
-
-### Pitfall: No Validation
-**Problem:** Errors discovered too late
-**Solution:** Validate at every boundary (Malli or manual)
-
-### Pitfall: Syntax Errors in Large Files
-**Problem:** Hard to find missing parens
-**Solution:** Build incrementally, test at each step
-
-### Pitfall: Testing Only with Synthetic Data
-**Problem:** Real data has edge cases
-**Solution:** Always test with production data early
-
-### Pitfall: Rigid CLI Design
-**Problem:** Only accepting one argument style
-**Solution:** Support both positional and flag arguments
-
-### Pitfall: Skipping Data Definitions
-**Problem:** No explicit data structure defined
-
-**❌ Wrong approach:**
-```clojure
-;; Bad - no explicit data structure
-(defn parse-csv [content] ...)
-```
-**Result:** Confusion about types, what format is expected, unclear intent
-
-**✓ Right approach:**
-```clojure
-;; Good - data definitions guide everything
-;; A CSV-Content is a String with multiple lines
-;; A CSV-Row is a Map<String, String>
-(defn parse-csv [content] ...)
-```
-**Result:** Clear expectations, guides implementation, prevents confusion
-
-### Pitfall: Not Testing Edge Cases
-**Problem:** Only testing happy path
-
-**❌ Wrong approach:**
-```clojure
-;; Only testing simple cases
-(parse-csv-line "A;B;C")  ;; ✓ Works
-;; But never testing edge cases...
-```
-**Result:** Edge cases will break in production
-
-**✓ Right approach:**
-```clojure
-;; Test edge cases too
-(parse-csv-line "A;B;C")        ;; ✓ Simple case
-(parse-csv-line "\"ABC;;\"\"")   ;; ✓ Empty fields
-(parse-csv-line "")             ;; ✓ Empty string
-(parse-csv-line "\"A\";\"B;C\"") ;; ✓ Quoted fields
-```
-**Result:** Robust function handles all cases
-
----
-
-## 10. Comprehensive Checklists
-
-### Function Checklist
-
-Before considering a function complete:
-
-- [ ] **Data definition written** (What type is the input? What type is output?)
-- [ ] **Function signature written** (Name: Input-Type -> Output-Type)
-- [ ] **Purpose statement written** (one sentence, no "and" or "or")
-- [ ] **Examples written** (minimum 3, including edge cases)
-- [ ] **Template created from data structure** (guides the implementation)
-- [ ] **Implementation follows template** (stays true to design)
-- [ ] **All examples tested in REPL** (don't skip this!)
-- [ ] **All examples pass** (including edge cases)
-- [ ] **Edge cases tested** (empty strings, empty collections, etc.)
-- [ ] **Error cases handled** (what if input is malformed?)
-- [ ] **Function does exactly what purpose statement says** (no more, no less)
-
-### Script Checklist
-
-Before considering a script complete:
-
-- [ ] **Every function follows HTDP process** (not just "good ones")
-- [ ] **Every function tested in REPL** (or test files)
-- [ ] **End-to-end test with real data** (synthetic tests aren't enough)
-- [ ] **Error handling for all failure modes** (missing files, invalid data, etc.)
-- [ ] **Clear error messages** (not stack traces for users)
-- [ ] **Script works for valid input** (happy path tested)
-- [ ] **Script fails gracefully for invalid input** (no crashes)
-- [ ] **Code is readable and well-commented** (future you will thank you)
-- [ ] **Field mappings documented** (for CSV transformations)
-- [ ] **Validation catches invalid data** (both manual and schema)
-- [ ] **Statistics included** (lines, functions, success rate)
-
-### Code Organization Checklist
-
-- [ ] Each function tested in REPL (or test files)
-- [ ] All examples from HTDP pass
-- [ ] Validation schemas defined (Malli or manual)
-- [ ] Validation catches invalid data
-- [ ] Error handling at boundaries
-- [ ] Simple, readable code
-- [ ] Single responsibility per function
-- [ ] Tested with real data (not just synthetic)
-- [ ] Field mappings documented
-- [ ] Script statistics/self-documentation included
-
-### Script Structure Template:
-```
-1. Data Definitions
-2. Validation Schemas (Malli) / Manual Validation
-3. Pure Functions (tested in REPL)
-4. Imperative Main
-5. Entry Point Call
-6. Error Handling Examples (in comments)
-7. Key Takeaways & Statistics
-```
-
----
-
-## 11. Example Complete Workflow
-
-### Task: Build CSV to Markdown Converter
-
-#### Step 1: Design Data
-```clojure
-;; CSV-Row: Map<String, String>
-;; Markdown-File: String (YAML + Markdown)
-```
-
-#### Step 2: REPL Tests
-```clojure
-;; Test parse-csv-line
-bb> (parse-csv-line "A;B;C")
-["A" "B", "C"]  ✓
-
-;; Test transform-row
-bb> (transform-row {:name "Test"})
-{:created "..." :name "Test" ...}  ✓
-
-;; Test with real data
-bb> (def real-data (slurp "production.csv"))
-bb> (def rows (parse-csv real-data))
-bb> (count rows)
-253  ✓
-```
-
-#### Step 3: Implement Main
-```clojure
-(defn -main [& args]
-  (let [parsed-args (parse-cli-args args)
-        input-file (:input parsed-args)]
-    (when-not input-file
-      (println "Usage: bb script.clj -i <input.csv>")
-      (System/exit 1))
-
-    (let [rows (parse-csv (slurp input-file))]
-      (doseq [row rows]
-        (-> (transform-row row)
-            generate-markdown
-            write-file))
-      (println "Conversion complete!"))))
-
-;; Run
-bb script.clj -i input.csv
-```
-
----
-
-## 12. Script Statistics as Documentation
-
-**Add to end of script for maintainers:**
-
-```clojure
-;; =============================================================================
-;; KEY TAKEAWAYS
-;; =============================================================================
-;; 1. REPL-driven development: Built and tested each function incrementally
-;; 2. HTDP methodology: Used signature, purpose, examples, template, implementation
-;; 3. Single-file architecture: All functions in one self-contained script
-;; 4. Validation-first: validate-csv-row catches errors early
-;; 5. Pure functions: Core logic is pure, I/O isolated in specific functions
-;; 6. Error handling: Graceful handling of missing files, empty CSVs, invalid data
-;; 7. Flexible CLI: Supports both positional and flag-based arguments
-;; 8. Clean output: Generated markdown with YAML front-matter for Obsidian
-
-;; =============================================================================
-;; STATISTICS
-;; =============================================================================
-;; Lines of code: 314
-;; Functions: 12
-;; Tested: Yes (REPL-driven + real data)
-;; CSV rows processed: 253
-;; Success rate: 100%
-
-;; =============================================================================
-;; ERROR HANDLING TESTS (for validation)
-;; =============================================================================
-(comment
-  ;; Test 1: Empty CSV
-  (def empty-csv "")
-  (parse-csv empty-csv)  ;; => []
-
-  ;; Test 2: Invalid row (missing required fields)
-  (def bad-row {:name "Test" :definition ""})
-  (try (validate-csv-row bad-row) (catch Exception e (.getMessage e)))
-  ;; => "Missing required fields: ..."
-
-  ;; Test 3: File not found error
-  ;; Run: ./csv-converter.clj nonexistent.csv
-  ;; Expected: "Error: File not found: nonexistent.csv"
-  )
-```
-
----
-
-## Appendix: REPL Session Examples
-
-### Typical REPL Session - Building parse-csv-line
-
-```clojure
-user=> ;; I'm starting with parse-csv-line
-user=> ;; Step 1: I need to define what a CSV-Field is
-user=> ;; A CSV-Field is a String
-;; nil
-
-user=> ;; Step 2: Function signature
-user=> ;; parse-csv-line: String -> [String]
-;; nil
-
-user=> ;; Step 3: Purpose
-user=> ;; Purpose: Parse CSV line into vector of fields
-;; nil
-
-user=> ;; Step 4: Examples
-user=> (parse-csv-line "A;B;C")
-;; => ["A" "B" "C"]
-;; (This fails because function doesn't exist yet!)
-
-user=> ;; Step 5: Template based on String input
-user=> (defn parse-csv-line [line]
-         (loop [chars (vec line)
-                result []
-                current ""
-                in-quotes false]
-           ;; Will implement step by step
-           ))
-;; #'user/parse-csv-line
-
-user=> ;; Step 6: Implementation
-user=> (defn parse-csv-line [line]
-         (loop [chars (vec line)
-                result []
-                current ""
-                in-quotes false]
-           (if (empty? chars)
-             (conj result current)
-             (let [c (first chars)
-                   rest (rest chars)]
-               (cond
-                 (and in-quotes (= c \"))
-                 (if (= (first rest) \")
-                   (recur (rest rest) result (str current \") in-quotes)
-                   (recur rest result current false))
-                 
-                 (and (not in-quotes) (= c \"))
-                 (recur rest result current true)
-                 
-                 (and (not in-quotes) (= c \;))
-                 (recur rest (conj result current) "" in-quotes)
-                 
-                 :else
-                 (recur rest result (str current c) in-quotes))))))
-;; #'user/parse-csv-line
-
-user=> ;; Now test it!
-user=> (parse-csv-line "A;B;C")
-["A" "B" "C"]
-
-user=> (parse-csv-line "\"A\";\"B;C\"")
-["A" "B;C"]
-
-user=> (parse-csv-line "\"ABC;;\"\"")
-["ABC" "" ""]
-
-user=> (parse-csv-line "")
-[""]
-
-user=> ;; All tests pass! ✓
-;; ✓ Success!
-
-user=> ;; Now I can move to the next function
-user=> ;; Let's build parse-csv-header
-```
-
-### Alternative: Using Test Files
+Use the project's declared dependencies and runtime. Check the environment before changing code:
 
 ```bash
-# Create test file
-$ cat > test_parse_csv_line.clj << 'EOF'
-;; HTDP Recipe for parse-csv-line
-
-;; Data definitions:
-;; A CSV-Field is a String
-
-;; Signature: parse-csv-line: String -> [String]
-
-;; Purpose: Parse a single CSV line into fields
-
-;; Examples:
-;; (parse-csv-line "A;B;C") => ["A" "B" "C"]
-;; (parse-csv-line "\"A\";\"B;C\"") => ["A" "B;C"]
-
-;; Implementation:
-(defn parse-csv-line [line]
-  (loop [chars (vec line)
-         result []
-         current ""
-         in-quotes false]
-    (if (empty? chars)
-      (conj result current)
-      (let [c (first chars)
-            rest (rest chars)]
-        (cond
-          (and in-quotes (= c \"))
-          (if (= (first rest) \")
-            (recur (rest rest) result (str current \") in-quotes)
-            (recur rest result current false))
-          
-          (and (not in-quotes) (= c \"))
-          (recur rest result current true)
-          
-          (and (not in-quotes) (= c \;))
-          (recur rest (conj result current) "" in-quotes)
-          
-          :else
-          (recur rest result (str current c) in-quotes))))))
-
-;; Test the function
-(println "Test 1:" (parse-csv-line "A;B;C"))
-(println "Test 2:" (parse-csv-line "\"A\";\"B;C\""))
-(println "Test 3:" (parse-csv-line "\"ABC;;\"\""))
-
-EOF
-
-# Run the test file
-$ bb test_parse_csv_line.clj
-Test 1: [A B C]
-Test 2: [A B;C]
-Test 3: [ABC  ]
+clojure -M -e "(println (clojure-version))"
 ```
 
-### Typical Beginner Mistakes
+Start the REPL through the project's normal alias. If the project defines a dev or test alias, use it:
+
+```bash
+clojure -M:dev
+```
+
+Verify the REPL is healthy before editing: require the main namespace, evaluate a known form, and confirm the expected result. If the REPL has been running for a long time or through prior failed experiments, restart it rather than debugging stale state.
+
+Do not load secrets into source files, fixtures, or committed EDN. Ordinary tests must not require network access, provider credentials, or live services.
+
+When adding a library, first establish the concrete problem it solves and why the standard library or an existing dependency is no longer clear. Check current documentation, add one capability at a time, and verify the operational effect in the REPL before writing code that depends on it.
+
+#### Consult local and authoritative documentation before guessing
+
+Use the sources in this order:
+
+1. project code, tests, README, and `comment` forms for project-specific behaviour;
+2. the REPL itself: `(doc f)`, `(source f)`, `(apropos "pattern")`, `(dir some.ns)`;
+3. installed library source for dependency behaviour;
+4. current official Clojure, library, or JVM documentation when local sources are insufficient.
+
+The REPL is the fastest and most version-accurate reference. Prefer it over web searches for API questions about code already on the classpath.
+
+### 3. Establish a baseline before editing
+
+Run the narrowest useful baseline checks:
+
+```bash
+clj-kondo --lint src test
+clojure -M:test
+```
+
+Then verify the REPL baseline:
 
 ```clojure
-;; ❌ MISTAKE 1: No examples, jumping straight to code
-user=> (defn parse-csv-line [line] ...)
-;; Writes entire implementation
-;; Tests at the end
-;; Gets 50 errors - which one to fix first?
-
-;; ✓ BETTER: Examples first
-user=> ;; (parse-csv-line "A;B;C") => ["A" "B" "C"]
-user=> ;; Now implement, test this example
-user=> (defn parse-csv-line [line] ...)
+(require '[my-app.core :as core] :reload)
+;; evaluate a known-good form and confirm the expected result
 ```
 
-```clojure
-;; ❌ MISTAKE 2: No data definitions
-user=> (defn parse-csv [content] ...)
-;; What format is content? String? File? Vector?
+Record which failures predate the change. Distinguish lint findings, failing tests, reflection warnings, namespace load errors, and REPL state confusion. Do not treat a pre-existing failure as evidence that the proposed change caused it.
 
-;; ✓ BETTER: Define data first
-user=> ;; A CSV-Content is a String with lines separated by \n
-user=> ;; A CSV-Row is a Map<String, String>
-user=> (defn parse-csv [content] ...)
+For a reported bug, reproduce it in the REPL before editing. For an existing pipeline being refactored, capture representative intermediate values before rearranging the implementation.
+
+### 4. Define the data contract
+
+Before choosing tests or abstractions, write down the data that matters:
+
+- the shape of input data (as a schema or an example);
+- the shape of output data;
+- the intermediate shapes at each pipeline step;
+- which keys are required and which are optional;
+- the run model's states and legal transitions, if orchestrating;
+- the interop boundary: which Java/Kotlin types enter, and what Clojure data they become;
+- the effects: what is read, written, called, or mutated.
+
+Separate external effects from deterministic transformations where the boundary is real. A typical boundary is:
+
+```text
+load/validate → pure pipeline steps → run-model transitions → effects at edges
 ```
 
-```clojure
-;; ❌ MISTAKE 3: Testing only happy path
-user=> (parse-csv-line "A;B;C")
-["A" "B" "C"]  ;; ✓ Works!
-;; Tests complete... or are they?
+Do not split namespaces merely because they are long. Split when a namespace has a distinct concept or can be tested independently.
 
-;; ✓ BETTER: Test edge cases too
-user=> (parse-csv-line "")           ;; Empty
-user=> (parse-csv-line "\"A;;\"\"")  ;; Empty fields
-user=> (parse-csv-line "\"A;\"B\"")  ;; Mismatched quotes
-```
+### 5. Choose the development strategy deliberately
 
----
+Use the strategy that matches the code's history and the change's intent.
 
-## 13. Key Takeaways
+#### Exploration: REPL first
 
-1. **REPL is your friend** - Always test in REPL first (interactive, -e, or test files)
-2. **HTDP prevents bugs** - Examples before implementation
-3. **Single-file scripts** - Simpler is better for Babashka (but >200 lines is OK if well-organized)
-4. **Validate everything** - Malli schemas or manual validation at boundaries
-5. **Break down complexity** - Small, pure functions
-6. **Test as you go** - Don't write 100 lines without testing
-7. **Test with real data** - Synthetic tests are not enough
-8. **Document field mappings** - Future maintainers will thank you
-9. **Flexible CLI** - Support both positional and flag arguments
-10. **Error isolation** - One bad row shouldn't kill the entire process
+For understanding data, exploring a Kotlin model's behaviour, or composing a new pipeline:
 
----
+1. Evaluate forms in a `comment` block or scratch namespace.
+2. Capture intermediate values with `def` inside the comment for inspection.
+3. When the exploration produces something load-bearing, extract it into a named function with a docstring.
+4. Add a test if the behaviour is a contract, not just an observation.
 
-## 14. Final Development Workflow
+#### Existing behaviour or legacy code: characterize first
 
-### Detailed Workflow with HTDP
+When the implementation already exists, write characterization tests (or REPL-captured examples) before refactoring it. Capture the behaviour that must not change. Then refactor behind that safety net.
 
-```
-1. Start REPL session (bb or bb -e or test files)
-2. Define data structures (explicit types for everything)
-3. Design function using HTDP:
-   a. Write data definitions
-   b. Write function signature (Input-Type -> Output-Type)
-   c. Write purpose statement (one sentence)
-   d. Write examples BEFORE coding (minimum 3, include edge cases)
-   e. Create template from data structure
-   f. Implement following template
-4. Load function in REPL
-5. Test ALL examples (don't skip any!)
-6. Fix any failures (use debugging workflow)
-7. Move to next function (repeat 2-6)
-8. When all functions done:
-   a. Assemble into main function
-   b. End-to-end test with test CSV
-   c. Fix any integration issues
-9. Add validation (Malli schemas or manual validation)
-10. Add error handling for all failure modes
-11. Test with real production data (not just synthetic)
-12. Add statistics, key takeaways, and self-documentation
-13. Final review against checklists
-14. Ship!
+#### New pipeline step or schema: test first
 
-Remember:
-- If you're stuck on syntax errors, you're going too fast
-- Use the REPL constantly (not just at the end)
-- Write examples before code (this is non-negotiable)
-- Describe what you're doing as you go (helps debugging)
-- Test small pieces until you're confident
-- One broken test is enough to stop and fix
-```
+For a new validation rule, transformation step, run-model transition, or interop wrapper:
 
-**Key Principle:** The REPL is your primary development tool. Test constantly, fail fast, fix immediately.
+1. Write a failing test describing the input data and expected output.
+2. Implement the smallest function that makes it pass.
+3. Verify in the REPL with additional examples.
+4. Add boundary and failure cases when the contract is stable.
+
+#### Pure refactoring: preserve first, then simplify
+
+Run the existing tests before changing structure. Do not add speculative abstractions. Add a test only when the refactor reveals an unprotected contract.
+
+### 6. Build proportionate coverage
+
+Do not optimize for a universal percentage. Cover risks and contracts instead of every function.
+
+The normal baseline is:
+
+| Area | Proportionate coverage |
+| --- | --- |
+| Boundary schema | Valid input accepted, each important invalid shape rejected with useful errors |
+| Pure pipeline step | Representative transformation plus meaningful empty, missing, or malformed input |
+| Run model | Legal transitions, illegal transitions rejected, and serialisation round-trip through EDN |
+| Interop wrapper | Fixture-backed Java/Kotlin objects converted to expected Clojure data; failure behaviour |
+| Orchestration | A complete run through fixture data; restart/replay if promised |
+| Agent-produced data | Schema validation rejects malformed or unsafe output before it enters the system |
+
+Use data-oriented assertions. Compare expected and actual EDN values directly; avoid asserting implementation details.
+
+Avoid:
+
+- a test for every trivial function;
+- tests that only prove a function was called;
+- network access or credentials in ordinary tests;
+- adding tests solely to satisfy an arbitrary coverage percentage.
+
+Property-based testing (test.check) is a natural fit: generate EDN values matching the schema, run them through pipelines, assert invariants hold for all generated inputs.
+
+### 7. Implement in small verified steps
+
+For each behaviour change:
+
+1. Change the test or schema first when using test-first development.
+2. Make the smallest source change.
+3. Evaluate the changed forms in the REPL.
+4. Inspect the result—compare actual data against expected data.
+5. Refactor only after behaviour is verified.
+6. Run lint and tests before continuing.
+
+Keep effects at the edges. Pass configuration as arguments. Do not read environment variables or system properties inside pipeline steps.
+
+After a structural change, run clj-kondo and the project's tests before continuing. Do not let a lint pass become the design objective.
+
+### 8. Interpret quality checks as design review
+
+Run the project's configured checks in their intended order. Then review the findings rather than applying automatic fixes blindly.
+
+#### clj-kondo
+
+clj-kondo is static analysis: it catches errors without executing code. Treat its findings as design pressure:
+
+- unused bindings and namespaces may indicate dead code or an abandoned exploration;
+- arity errors and unresolved symbols are defects;
+- reflection warnings indicate interop boundaries that need type hints or wrapper functions;
+- redundant expressions may indicate a pipeline step that has lost its purpose.
+
+Keep linters enabled when they expose real risks. Suppress narrowly, with a reason, only for a documented boundary pattern. Do not disable checks globally to silence noise.
+
+#### Reflection warnings
+
+Set `*warn-on-reflection*` during development. Every warning is either a performance problem or an interop boundary that needs a type hint. Fix them or document why they are accepted.
+
+#### REPL state hygiene
+
+If the REPL behaves unexpectedly:
+
+1. Reload the namespace explicitly: `(require 'my.ns :reload)`.
+2. Check for stale `def` bindings from earlier experiments.
+3. If confusion persists, restart the REPL. Do not debug phantom behaviour caused by stale state.
+
+#### Check conflicts
+
+When tools disagree (e.g., clj-kondo's preferred style versus the project's existing convention), choose the clearest project policy and configure it explicitly. Prefer a stable, documented convention over alternating code to satisfy different tools.
+
+### 9. Exercise the system, not only its tests
+
+Before declaring work complete, run the real system through safe paths appropriate to the work:
+
+- a representative pipeline run through fixture data;
+- schema validation with both valid and invalid input;
+- a complete orchestrated run with an inspectable EDN run model;
+- Java/Kotlin interop calls through the designed facade;
+- agent-produced data validated and rejected where unsafe;
+- serialisation round-trip: write the run model as EDN, read it back, compare.
+
+Check output shape, run-model completeness, and the absence of secrets in output. Run a live remote operation only when the user's explicit runtime credential boundary is available and the operation is safe and intended.
+
+### 10. Finish the project-facing work
+
+Before delivering:
+
+- run the complete configured lint/test command;
+- verify all affected namespaces, tests, schemas, and documentation;
+- extract any load-bearing REPL explorations into named functions or tests;
+- clean up scratch namespaces and stale `def` bindings;
+- update README usage when behaviour or setup changed;
+- record dependency, schema, or operational decisions where maintainers will need them;
+- report exactly what was evaluated and what was not, especially live interop and remote paths.
+
+## Completion checklist
+
+A Clojure change is ready when:
+
+- the data contract (schemas, shapes, required/optional keys) is explicit;
+- the project's Clojure/JVM environment is reproducible;
+- ordinary tests require no network, credentials, or live services;
+- existing behaviour is characterized before risky refactors;
+- new pipeline steps and schemas were developed test-first where that clarified the contract;
+- tests cover the important normal, boundary, error, interop, and orchestration paths proportionately;
+- external systems are behind small named wrapper functions;
+- run models are EDN, inspectable, and serialisable;
+- exploratory work was captured in `comment` forms or extracted into named functions;
+- clj-kondo and tests pass;
+- quality findings were classified and handled deliberately;
+- the REPL environment is clean (no stale bindings, no scratch state in production namespaces);
+- the README and final evidence are truthful.

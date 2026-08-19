@@ -34,7 +34,16 @@ leaves non-managed content alone.
 
 All state-changing commands preview by default. Add `--apply` to write.
 Commands return `0` when clean, `1` for reported problems, and `2` for usage
-errors. Add `--json` where supported when another agent is consuming output.
+errors. Every command accepts `--json` for agent consumption. On first use the
+entrypoint installs missing locked gems with Bundler, then restarts itself.
+
+Run the complete network-free test suite from the Ruby project:
+
+```bash
+cd tooling/skills
+bundle check
+bundle exec ruby -Ilib -Itest -e 'Dir["test/test_*.rb"].sort.each { |file| require_relative file }'
+```
 
 ### Curate and deploy
 
@@ -91,11 +100,18 @@ tooling/skills/bin/skills fetch --all --apply
 
 ## Adopt a stray skill already in a target
 
-If a skill exists in a harness target but not here yet:
+If a skill exists in a harness target but not here yet, the manager
+auto-detects it in configured targets:
 
 ```bash
-tooling/skills/bin/skills gather stray-skill --from ~/.agents/skills/stray-skill
-tooling/skills/bin/skills gather stray-skill --from ~/.agents/skills/stray-skill --apply
+tooling/skills/bin/skills gather stray-skill
+tooling/skills/bin/skills gather stray-skill --apply
+```
+
+Use `--from <target-root-or-skill-dir>` when the source is elsewhere:
+
+```bash
+tooling/skills/bin/skills gather stray-skill --from /path/to/skills
 ```
 
 This copies the skill from the target into the canonical store. Run `deploy`

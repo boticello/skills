@@ -10,8 +10,9 @@
 #   commit = "<full sha>"
 #   path = "optional/path/to/skill"  # needed when the upstream has multiple skills
 #
-# Add entries automatically with:
-#   ./deploy/skills-deploy fetch owner/repo
+# Preview and add entries with:
+#   tooling/skills/bin/skills fetch owner/repo
+#   tooling/skills/bin/skills fetch owner/repo --apply
 
 [nia]
 url = "https://github.com/nozomio-labs/nia-skill"

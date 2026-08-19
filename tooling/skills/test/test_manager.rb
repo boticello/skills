@@ -5,20 +5,6 @@ require "skills"
 require "stringio"
 
 class SkillsManagerTest < Minitest::Test
-  def with_manager_sandbox
-    Dir.mktmpdir("skills-manager") do |directory|
-      root = Pathname(directory).join("repos/skills")
-      FileUtils.mkdir_p(root.join("tooling/skills"))
-      File.write(root.join("tooling/skills/skills.toml"), <<~TOML)
-        ignore = ["tooling", "vendor"]
-
-        [[target]]
-        name = "test"
-        path = "#{root.join("target")}" 
-      TOML
-      yield root
-    end
-  end
 
   def test_catalogue_is_recursive_and_ignores_tooling_fixtures
     with_manager_sandbox do |root|
@@ -88,7 +74,7 @@ class SkillsManagerTest < Minitest::Test
       File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
       manager = Skills::Manager.new(root: root)
 
-      assert_equal [:add], manager.list.payload.first[:drift]
+      assert_equal [:add], manager.list.payload.fetch(:rows).first[:drift]
       assert_includes manager.doctor.findings.map(&:message), "#{root.join("target/alpha")}: missing resolved skill"
     end
   end
@@ -108,7 +94,7 @@ class SkillsManagerTest < Minitest::Test
       FileUtils.mkdir_p(agents)
       File.write(agents.join("build.md"), "---\nskills: [alpha, beta]\n---\n")
 
-      rows = Skills::Manager.new(root: root).list.payload.to_h { |row| [row[:name], row] }
+      rows = Skills::Manager.new(root: root).list.payload.fetch(:rows).to_h { |row| [row[:name], row] }
 
       assert_equal [inherited.to_s], rows.fetch("alpha").fetch(:projects)
       assert_equal [custom.to_s], rows.fetch("beta").fetch(:projects)
@@ -148,7 +134,22 @@ class SkillsManagerTest < Minitest::Test
 
       assert_includes result.findings.map(&:message), "suite scope references missing skill missing"
       assert_equal 1, result.exit_code
-      assert_kind_of Array, result.payload
+      assert_equal [], result.payload.fetch(:pairs)
+    end
+  end
+
+  def test_suite_overlap_reports_malformed_profile
+    with_manager_sandbox do |root|
+      agents = root.parent.join("agents/agents")
+      FileUtils.mkdir_p(agents)
+      profile = agents.join("build.md")
+      File.write(profile, "---\nskills: not-a-list\n---\n")
+
+      result = Skills::Manager.new(root: root).overlap(scope: "suite", suite: "build")
+
+      assert result.findings.any? { |finding| finding.message.include?(profile.to_s) && finding.message.include?("skills must be an array") }
+      assert_equal 1, result.exit_code
+      assert_empty result.payload.fetch(:pairs)
     end
   end
 
@@ -210,16 +211,16 @@ class SkillsManagerTest < Minitest::Test
     end
   end
 
-  def test_lint_keeps_non_global_name_mismatch_advisory
+  def test_lint_blocks_non_global_name_mismatch
     with_manager_sandbox do |root|
       write_skill(root, "alpha")
       File.write(root.join("functional/alpha/SKILL.md"), "---\nname: other\ndescription: alpha\n---\n")
-      File.write(root.join("global-manifest.toml"), "skills = []\n")
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
 
-      mismatch = Skills::Manager.new(root: root).lint.findings.find { |finding| finding.message.include?("metadata mismatch") }
+      mismatch = Skills::Manager.new(root: root).lint.findings.find { |finding| finding.message.include?("does not match directory") }
 
       refute_nil mismatch
-      assert_equal :warning, mismatch.severity
+      assert_equal :error, mismatch.severity
     end
   end
 
@@ -229,6 +230,7 @@ class SkillsManagerTest < Minitest::Test
       write_skill(root, "beta")
       File.write(root.join("global-manifest.toml"), "skills = [\"alpha\", \"beta\"]\n")
       project = root.join("project")
+      FileUtils.mkdir_p(project)
       manager = Skills::Manager.new(root: root)
 
       result = manager.disable("beta", project: project, apply: true)
@@ -304,6 +306,8 @@ class SkillsManagerTest < Minitest::Test
 
   def test_cli_accepts_global_and_rejects_it_with_project
     with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
       out = StringIO.new
       err = StringIO.new
 
@@ -316,6 +320,211 @@ class SkillsManagerTest < Minitest::Test
     end
   end
 
+  def test_missing_manifest_never_removes_existing_target_skills
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      target = root.join("target/alpha")
+      FileUtils.mkdir_p(target)
+      File.write(target.join("SKILL.md"), "deployed")
+
+      result = Skills::Manager.new(root: root).deploy(apply: true)
+
+      assert_equal false, result.payload[:applied]
+      assert result.findings.any? { |finding| finding.message.include?("manifest is missing") }
+      assert_path_exists target
+    end
+  end
+
+  def test_empty_manifest_refuses_destructive_cleanup
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      File.write(root.join("global-manifest.toml"), "skills = []\n")
+      target = root.join("target/alpha")
+      FileUtils.mkdir_p(target)
+      File.write(target.join("SKILL.md"), "deployed")
+
+      result = Skills::Manager.new(root: root).deploy(apply: true)
+
+      assert_empty result.payload[:actions]
+      assert_equal false, result.payload[:applied]
+      assert_path_exists target
+    end
+  end
+
+  def test_project_deploy_uses_existing_project_agents_target
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
+      project = root.join("project")
+      FileUtils.mkdir_p(project)
+
+      preview = Skills::Manager.new(root: root).deploy(project: project)
+
+      assert_equal [project.join(".agents/skills/alpha")], preview.payload[:actions].map(&:target)
+      assert_empty preview.findings
+    end
+  end
+
+  def test_project_mutations_reject_missing_project_root
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
+      missing = root.join("missing-project")
+
+      result = Skills::Manager.new(root: root).enable("alpha", project: missing, apply: true)
+
+      assert result.findings.any? { |finding| finding.message.include?("project does not exist") }
+      refute_path_exists missing
+    end
+  end
+
+  def test_gather_auto_discovers_configured_target
+    with_manager_sandbox do |root|
+      source = root.join("target/stray")
+      FileUtils.mkdir_p(source)
+      File.write(source.join("SKILL.md"), "---\nname: stray\ndescription: stray\n---\n")
+      manager = Skills::Manager.new(root: root)
+
+      preview = manager.gather("stray")
+      refute_path_exists root.join("personal/stray")
+      assert_equal source.to_s, preview.payload[:source]
+
+      applied = manager.gather("stray", apply: true)
+      assert_empty applied.findings
+      assert_path_exists root.join("personal/stray/SKILL.md")
+    end
+  end
+
+  def test_gather_accepts_a_target_root_as_from
+    with_manager_sandbox do |root|
+      source_root = root.join("wild")
+      FileUtils.mkdir_p(source_root.join("stray"))
+      File.write(source_root.join("stray/SKILL.md"), "---\nname: stray\ndescription: stray\n---\n")
+
+      result = Skills::Manager.new(root: root).gather("stray", from: source_root)
+
+      assert_equal source_root.join("stray").to_s, result.payload[:source]
+    end
+  end
+
+  def test_gather_rejects_destination_escape
+    with_manager_sandbox do |root|
+      source = root.join("wild")
+      FileUtils.mkdir_p(source)
+      File.write(source.join("SKILL.md"), "---\nname: stray\ndescription: stray\n---\n")
+
+      result = Skills::Manager.new(root: root).gather("stray", from: source, category: "../outside", apply: true)
+
+      assert result.findings.any? { |finding| finding.message.include?("invalid category") }
+      refute_path_exists root.parent.join("outside/stray")
+    end
+  end
+
+  def test_malformed_profile_is_reported_by_doctor
+    with_manager_sandbox do |root|
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
+      write_skill(root, "alpha")
+      profiles = root.parent.join("agents/agents")
+      FileUtils.mkdir_p(profiles)
+      profile = profiles.join("broken.md")
+      File.write(profile, "---\nskills: [alpha\n---\n")
+
+      messages = Skills::Manager.new(root: root).doctor.findings.map(&:message)
+
+      assert messages.any? { |message| message.include?(profile.to_s) && message.include?("invalid YAML") }
+    end
+  end
+
+  def test_duplicate_catalogue_names_block_lint_and_deploy
+    with_manager_sandbox do |root|
+      %w[first second].each do |category|
+        skill = root.join(category, "alpha")
+        FileUtils.mkdir_p(skill)
+        File.write(skill.join("SKILL.md"), "---\nname: alpha\ndescription: alpha\n---\n")
+      end
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
+      manager = Skills::Manager.new(root: root)
+
+      assert manager.lint.findings.any? { |finding| finding.message.include?("duplicate skill alpha") }
+      deploy = manager.deploy(apply: true)
+      assert_equal false, deploy.payload[:applied]
+      assert deploy.findings.any? { |finding| finding.message.include?("duplicate skill alpha") }
+    end
+  end
+
+  def test_global_enable_and_disable_preview_then_apply
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      write_skill(root, "beta")
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
+      manager = Skills::Manager.new(root: root)
+
+      preview = manager.enable("beta")
+      assert_equal %w[alpha beta], preview.payload[:skills]
+      assert_equal ["alpha"], Skills::Config.load(root).manifest_skills
+
+      manager.enable("beta", apply: true)
+      assert_equal %w[alpha beta], Skills::Config.load(root).manifest_skills
+      manager.disable("alpha", apply: true)
+      assert_equal ["beta"], Skills::Config.load(root).manifest_skills
+    end
+  end
+
+  def test_lint_strict_promotes_advisories_to_errors
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
+
+      findings = Skills::Manager.new(root: root).lint(strict: true).findings
+
+      assert findings.any?
+      assert findings.all? { |finding| finding.severity == :error }
+    end
+  end
+
+  def test_doctor_aggregates_independent_surface_failures
+    with_manager_sandbox do |root|
+      File.write(root.join("global-manifest.toml"), "skills = [\n")
+      profiles = root.parent.join("agents/agents")
+      FileUtils.mkdir_p(profiles)
+      profile = profiles.join("broken.md")
+      File.write(profile, "---\nskills: [alpha\n---\n")
+      project = root.join("project")
+      FileUtils.mkdir_p(project.join(".agents"))
+      File.write(project.join(".agents/skills-manifest.toml"), "add = [\"missing\"]\nexclude = []\n")
+      home = root.join("home")
+      FileUtils.mkdir_p(home.join(".codex"))
+      File.write(home.join(".codex/config.toml"), "not [ valid toml\n")
+
+      messages = Skills::Manager.new(root: root, home: home).doctor(project: project).findings.map(&:message)
+
+      assert messages.any? { |message| message.include?("invalid TOML") && message.include?("global-manifest") }
+      assert messages.any? { |message| message.include?(profile.to_s) && message.include?("invalid YAML") }
+      assert messages.any? { |message| message.include?("project manifest references missing skill missing") }
+      assert messages.any? { |message| message.include?("Codex config is unparsable") }
+    end
+  end
+
+  def test_doctor_fix_prunes_dead_project_manifest_references
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      File.write(root.join("global-manifest.toml"), "skills = [\"alpha\"]\n")
+      project = root.join("project")
+      FileUtils.mkdir_p(project.join(".agents"))
+      manifest = project.join(".agents/skills-manifest.toml")
+      File.write(manifest, "add = [\"missing\"]\nexclude = []\n")
+      manager = Skills::Manager.new(root: root)
+
+      preview = manager.doctor(fix: true, project: project)
+      assert_equal "missing", preview.payload[:planned_project_references].first[:name]
+      assert_includes File.read(manifest), "missing"
+
+      applied = manager.doctor(fix: true, apply: true, project: project)
+      assert_equal "missing", applied.payload[:pruned_project_references].first[:name]
+      refute_includes File.read(manifest), "missing"
+    end
+  end
+
   private
 
   def write_upstream_skill(root, name, value)
@@ -325,8 +534,4 @@ class SkillsManagerTest < Minitest::Test
     File.write(directory.join("value.txt"), value)
   end
 
-  def git(directory, *arguments)
-    _stdout, stderr, status = Open3.capture3("git", "-C", directory.to_s, *arguments)
-    assert_predicate status, :success?, "git #{arguments.join(" ")} failed: #{stderr}"
-  end
 end

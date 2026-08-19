@@ -17,6 +17,9 @@ orca-cli
 orca-linear
 orchestration
 
+# Paseo-installed skills in ~/.agents/skills (managed by the Paseo app)
+paseo*
+
 # ZCode plugin skill installed into ~/.agents/skills (managed by ZCode plugins)
 find-skills
 

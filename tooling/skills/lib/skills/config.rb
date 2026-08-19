@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 module Skills
+  Target = Data.define(:name, :path)
+
   Config = Data.define(:root, :ignore, :targets, :project_roots, :allowlist_path) do
-    Target = Data.define(:name, :path)
 
     def self.load(root)
       root = Pathname(root).expand_path
@@ -49,7 +50,7 @@ module Skills
       ]
       body.concat(skills.sort.map { |name| "  #{name.inspect}," })
       body << "]"
-      File.write(path, "#{body.join("\n")}\n")
+      atomic_write(path, "#{body.join("\n")}\n")
     end
 
     def write_project_manifest(path, add:, exclude:)
@@ -57,13 +58,24 @@ module Skills
       lines << "add = [#{add.sort.map(&:inspect).join(", ")}]"
       lines << "exclude = [#{exclude.sort.map(&:inspect).join(", ")}]"
       FileUtils.mkdir_p(path.dirname)
-      File.write(path, "#{lines.join("\n")}\n")
+      atomic_write(path, "#{lines.join("\n")}\n")
     end
 
     def allowlist
       return [] unless allowlist_path.file?
 
       allowlist_path.readlines(chomp: true).map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
+    end
+
+    private
+
+    def atomic_write(path, content)
+      FileUtils.mkdir_p(path.dirname)
+      temporary = path.dirname.join(".#{path.basename}.skills-#{Process.pid}-#{rand(1_000_000)}")
+      File.write(temporary, content)
+      File.rename(temporary, path)
+    ensure
+      FileUtils.rm_f(temporary) if defined?(temporary) && temporary
     end
   end
 end
