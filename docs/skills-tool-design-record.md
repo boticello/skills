@@ -171,12 +171,32 @@ requirement "no duplicates" decides it. Skill format is identical across
 targets, so a target is just a destination path.
 
 ### D5. Codex `config.toml`: hygiene-managed, never intent-writing
-**Decision.** The tool **reads** `[[skills.config]]` and **prunes dead-path
-entries** (22 today) via a marker-delimited managed splice that leaves the
-rest of the file byte-identical (validated by re-parsing after write). The
-tool **never writes or removes disable/enable intent**: those switches are
-Codex-local user state, keyed by path, owned by Codex's UI/commands. `doctor`
-always reports the state of this file.
+**Decision.** The tool **reads** `[[skills.config]]` (per-path disable
+switches) and relates them to the global manifest via a four-way
+classification, because the two lists are separate sources of truth for
+"which skills are active globally":
+
+| Class | Meaning | Tool action |
+|---|---|---|
+| **dead** | switch path no longer exists (26 at resolution time) | `doctor` errors; `doctor --fix --apply` prunes |
+| **conflict** | live switch disables a skill that IS in the global manifest (8 at resolution time) | `doctor` warns with both remedies; **never auto-resolved** |
+| **stray** | live switch, skill not in the manifest | reported for the record |
+| **enabled** | live switch, enabled | reported if it appears |
+
+**Prune mechanics (refined 2026-08-19 from the original marker-splice
+idea).** Only dead entries whose keys are exactly `{path, enabled}` are
+removed; entries with unknown keys stay untouched (reported). Removal is
+line-surgical — the surviving text keeps Codex's own formatting
+byte-for-byte — validated by re-parsing: the pruned document must
+deep-equal the original minus exactly the removed entries, or the write is
+refused. A timestamped backup is taken first. Markers were dropped: they
+presume the tool owns a contiguous block it wrote, but these entries were
+written by Codex and interleave with live intent the tool must not touch.
+
+The tool **never writes or removes disable/enable intent**: those switches
+are Codex-local user state, keyed by path, owned by Codex's UI/commands.
+A conflict is surfaced with both remedies (re-enable it in Codex, or
+`skills disable <name> --global --apply`) and resolved by the operator.
 
 **Rationale.** Resolves the P-1291 discussion decision ("manage it as a
 target") with the semantics the probe established: it is a disable list, not
@@ -250,11 +270,12 @@ intended to become blocking once the catalogue is clean).
 ### D11. Dependencies: minimal, boring
 **Decision.** `toml-rb` (read + write TOML — four files now: manifests,
 SOURCES.toml, skills.toml, Codex config parse), stdlib `OptionParser`
-(subcommand dispatch is a case statement), stdlib `Minitest`, no HTTP gem
+(subcommand dispatch is a case statement), development-only `minitest` (Ruby
+4.0 no longer ships `minitest/autorun` as a standard-library file), no HTTP gem
 (`fetch` shells `git` as today), no CLI framework. **Manifest writes:** the
 tool owns `global-manifest.toml` and project manifests and regenerates them
 with a standard generated header (their comments are tool documentation, not
-user prose). **Codex config writes:** marker-splice only (D5). Justification
+user prose). **Codex config writes:** validated surgical prune only (D5). Justification
 for the single gem: the bash script's two hand-rolled TOML parsers were a
 listed defect; correctness across four files beats regex.
 
@@ -336,3 +357,11 @@ README rewritten as part of implementation (current one is stale: dead
      live in arbitrary repos, and manifests are machine-regenerated (D11).
   4. Discovery note added (D1): `tooling/` must be ignored so test-fixture
      `SKILL.md` files never enter the catalogue.
+- 2026-08-19 (D5 resolved during implementation, P-1292): the marker-splice
+  mechanism was replaced by **validated surgical pruning** with a four-way
+  classification of `[[skills.config]]` entries (dead / conflict / stray /
+  enabled) — the conflict class being the realization that the global
+  manifest and Codex's disable list are two competing sources of truth for
+  global skill activation. Doctor surfaces conflicts with both remedies;
+  the operator decides. `doctor --fix` is itself preview-gated behind
+  `--apply`, like every other state-changing command.

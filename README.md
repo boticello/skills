@@ -1,60 +1,83 @@
 # skills
 
-The single source of truth for AI agent skills. Hand-edit here; `skills-deploy`
-copies to each harness target directory. No registries, no lockfiles, no
-symlinks in the deploy path — the directory tree *is* the state.
+The authoritative catalogue for agent skills. A skill is a directory containing
+`SKILL.md`; the repository tree is the catalogue. `tooling/skills` provides the
+Ruby manager that validates the catalogue and mirrors the selected skills into
+agent harnesses. It never makes symlinks in a managed target.
 
 ```
 ~/Me/repos/skills/          ← AUTHORITATIVE (this repo, git-tracked)
-├── <category>/<skill>/     ← authored skills (tracked → GitHub)
-├── vendor/<skill>/         ← third-party skills (gitignored → local only)
-├── SOURCES.toml            ← provenance for vendor/ (url + commit)
-├── allowlist.txt           ← target entries deploy must never remove
-└── deploy/skills-deploy    ← the deploy script
+├── <category>/<skill>/     authored skills
+├── vendor/<skill>/         locally vendored third-party skills
+├── SOURCES.toml            vendor provenance (URL, commit, optional path)
+├── global-manifest.toml    curated global selection
+├── allowlist.txt           target entries a mirror must leave alone
+└── tooling/skills/         Ruby manager, tests, and configuration
 ```
 
-## Workflow
+## Manager
 
-Edit a skill, then deploy:
+Run the manager from the repository root:
 
 ```bash
-# Copy canonical → all harness targets (idempotent; skips unchanged)
-./deploy/skills-deploy deploy
-
-# Deploy to a specific project instead of global (see Scoping below)
-./deploy/skills-deploy deploy --dest ~/Me/code/myproject
-
-# Preview what would change without writing
-./deploy/skills-deploy deploy --dry-run
-
-# Compare managed targets by name and content (read-only)
-./deploy/skills-deploy audit
-
-# Check canonical skill structure, metadata and references (read-only)
-./deploy/skills-deploy lint
+tooling/skills/bin/skills list
+tooling/skills/bin/skills lint
+tooling/skills/bin/skills doctor
+tooling/skills/bin/skills deploy                 # preview only
+tooling/skills/bin/skills deploy --apply         # make the planned changes
 ```
 
-Global targets (never hand-edit — these are generated):
-- `~/.agents/skills/` — ZCode, Zed, Warp, Memo, opencode-CLI
-- `~/.codex/skills/`  — Codex (`.system/` built-ins and plugin symlinks skipped)
+The configured launch target is `~/.agents/skills`. It is shared by ZCode,
+Zed, Warp, Memo, opencode and Codex. `~/.codex/skills` is not a future deploy
+target; migration removes only the managed copies there, with backups, and
+leaves non-managed content alone.
 
-The global set is defined by `global-manifest.toml`; it is a curated selection,
-not a list of every skill in this repository. For project-scoped deployment,
-see [Scoping](#scoping-global-vs-project-skills). The complete target-boundary
-model is in [`docs/skills-source-of-truth.md`](docs/skills-source-of-truth.md).
+All state-changing commands preview by default. Add `--apply` to write.
+Commands return `0` when clean, `1` for reported problems, and `2` for usage
+errors. Add `--json` where supported when another agent is consuming output.
 
-Re-running `deploy` with no changes touches nothing.
+### Curate and deploy
+
+`global-manifest.toml` is a curated global set, not a registry of every skill
+in this repository.
+
+```bash
+# Show every discovered skill, its home, global selection and target drift.
+tooling/skills/bin/skills list
+
+# Preview then change the global manifest.
+tooling/skills/bin/skills enable skill-name
+tooling/skills/bin/skills enable skill-name --apply
+tooling/skills/bin/skills disable skill-name --apply
+
+# Project resolution is (global - exclude) + add.
+tooling/skills/bin/skills deploy --project ~/Me/code/myproject
+tooling/skills/bin/skills deploy --project ~/Me/code/myproject --apply
+```
+
+A project manifest lives at `<project>/.agents/skills-manifest.toml`:
+
+```toml
+add = ["project-only-skill"]
+exclude = ["global-skill-not-needed-here"]
+```
+
+Add parent directories containing managed projects to `project_roots` in
+`tooling/skills/skills.toml`. `list` and `doctor` recursively discover project
+manifests beneath those roots; `--project PATH` checks an explicit project.
+
+Mirror removals are moved to `${XDG_STATE_HOME:-~/.local/state}/skills-backups/<timestamp>/`;
+allowlisted entries and target symlinks are left untouched. Managed copies omit
+`.DS_Store`, `.skillkit.json`, `.skillfish.json`, and `.git`.
 
 ## Add a third-party skill
 
 ```bash
-# Fetch via git with provenance recorded in SOURCES.toml
-./deploy/skills-deploy fetch owner/repo                 # single-skill repo
-./deploy/skills-deploy fetch owner/repo --skill name    # pick one from multi-skill
-./deploy/skills-deploy fetch owner/repo --list          # see what's inside
-
-# Then deploy to fan it out
-./deploy/skills-deploy deploy
+tooling/skills/bin/skills fetch owner/repository --list
+tooling/skills/bin/skills fetch owner/repository --skill skill-name
+tooling/skills/bin/skills fetch owner/repository --skill skill-name --apply
+tooling/skills/bin/skills update skill-name --apply
+tooling/skills/bin/skills fetch --all --apply
 ```
 
 Vendored skills live in `vendor/` (gitignored), so they deploy locally but
@@ -62,7 +85,8 @@ aren't pushed to GitHub. `SOURCES.toml` (tracked) records each one's URL and
 commit so they're reproducible on a fresh machine:
 
 ```bash
-# On a new machine: re-fetch each vendored skill from SOURCES.toml, then deploy.
+# Rehydrate local vendor copies from tracked provenance.
+tooling/skills/bin/skills fetch --all --apply
 ```
 
 ## Adopt a stray skill already in a target
@@ -70,124 +94,49 @@ commit so they're reproducible on a fresh machine:
 If a skill exists in a harness target but not here yet:
 
 ```bash
-./deploy/skills-deploy gather <name>                       # auto-detect source
-./deploy/skills-deploy gather <name> --from codex          # specify source
-./deploy/skills-deploy gather <name> --category tools      # specify category
+tooling/skills/bin/skills gather stray-skill --from ~/.agents/skills/stray-skill
+tooling/skills/bin/skills gather stray-skill --from ~/.agents/skills/stray-skill --apply
 ```
 
 This copies the skill from the target into the canonical store. Run `deploy`
 afterward to make the target a clean mirror.
 
-## What's here
-
-78 authored skills across 12 categories, plus 21 locally vendored skills at
-the 2026-08-10 inventory. The directory tree and `skills-deploy list` are the
-authoritative inventory; this summary is intentionally count-based so it does
-not become a second registry.
-
-| Category | Skills |
-|----------|--------|
-| **agent-workflow** | 10 |
-| **analysis** | 1 |
-| **debug** | 1 |
-| **domain** | 4 |
-| **go-slice** | 4 |
-| **knowledge-management** | 5 |
-| **languages** | 4 |
-| **personal** | 17 |
-| **planning** | 7 |
-| **review** | 4 |
-| **tools** | 16 |
-| **vcs** | 5 |
-| **vendor/** (gitignored) | 21 |
-
 ## Skill format
 
-Every skill is a directory containing a `SKILL.md` with standardised frontmatter:
+Every skill is a directory containing `SKILL.md` with frontmatter:
 
 ```yaml
 ---
 name: skill-name
-description: What this skill does
+description: A concise functional description.
+triggers:
+  - when this capability is needed
 ---
-
-# Skill Name
-
-Instructions for the agent...
 ```
 
-All target harnesses read this identical format — only the parent directory
-differs, so `deploy` is a flat copy with no translation.
-
-## Scoping: global vs project skills
-
-Not every skill belongs in every context. The deploy mechanism supports two
-scopes, each governed by a manifest:
-
-- **Global default** — `global-manifest.toml` (in this repo) defines the
-  universal set shipped to `~/.agents/skills/` and `~/.codex/skills/`.
-  `skills-deploy deploy` mirrors it.
-- **Project** — `proj/.agents/skills-manifest.toml` layers on top: `add` for
-  skills this project wants beyond global, `exclude` for global skills to
-  suppress here. `skills-deploy deploy --dest <project>` resolves
-  `(global - exclude + add)` and mirrors it into the project's harness dirs.
-
-Resolution is always `(global_default - exclude) + add` — additive by default,
-with surgical exclusions. One manifest per scope, fanned identically to all
-harness dirs at that scope.
-
-See [`docs/scoping-rationale.md`](docs/scoping-rationale.md) for the full
-reasoning behind why the global manifest lives in the repo (not in `~/.agents/`),
-why project manifests live in projects (not in the repo), and why there is no
-per-harness manifest.
-
-### Examples
-
-```bash
-# Global: mirror global-manifest.toml's set to home dirs
-./deploy/skills-deploy deploy
-
-# A code project that wants CBM but not personal/workflow skills
-cat > ~/Me/code/myproject/.agents/skills-manifest.toml <<'EOF'
-add = ["cbm"]
-exclude = ["shopping-management", "lark-crm"]
-EOF
-./deploy/skills-deploy deploy --dest ~/Me/code/myproject
-
-# Preview without writing
-./deploy/skills-deploy deploy --dest ~/Me/code/myproject --dry-run
-```
-
-A project with no manifest gets the bare global default. Skills not in the
-resolved set are removed from the project (backed up), so project dirs stay
-clean rather than accumulating drift.
+The directory name and frontmatter `name` must agree. `lint` checks duplicate
+names, dead references, dead manifest/profile entries and basic selection
+quality. Use `overlap` to review competing trigger language. The authoritative
+operating model is in the [design record](docs/skills-tool-design-record.md).
 
 ## Craft Agents (manual — out of automation)
 
 Craft Agents is pull-based and workspace-scoped, not repo-local auto-loaded.
 Skills are `@mention`-ed into conversations and managed via the Craft desktop
-UI. It cannot be driven by the deploy script.
+UI. It cannot be driven by the skills manager.
 
-To use a skill in Craft, copy its folder manually from `originals/` or
-`vendor/` into the relevant Craft workspace via the UI. This is a one-way,
-manual step — Craft is intentionally a bootstrap/export surface, not a deploy
-target.
+To use a skill in Craft, copy its folder manually from the relevant category or
+`vendor/` into the relevant Craft workspace. This is a one-way, manual step —
+Craft is intentionally a bootstrap/export surface, not a deploy target.
 
-## Design notes
+## Transition status
 
-- **No registry to rot.** The repo directory tree is the only state. Previous
-  attempts (skillkit, skillfish) maintained lockfiles that drifted from
-  reality. This script has no state of its own.
-- **Copies, not symlinks.** Codex has a known bug where symlinked skill dirs
-  silently fail to load. Deploy always writes real directories.
-- **Backups, not deletions.** Skills removed from a target during mirror
-  cleanup are moved to `~/.local/state/skills-backups/<timestamp>/`, never
-  destroyed.
-- **Scoped to skills only.** This deliberately does not sync MCP config, rules,
-  providers, profiles, or hooks. Those are separate concerns (a prior,
-  over-ambitious attempt to unify everything stalled under that scope).
+Cutover complete (2026-08-19): the legacy bash script and `deploy/` are
+removed, `~/.codex/skills` managed copies are retired (backed up), and
+`tooling/skills/` is the sole manager. Do not edit generated target
+directories by hand.
 
-## License
+## Licence
 
-Apache 2.0 (for the authored/original skills). Vendored skills retain their
-upstream licenses — see `SOURCES.toml` for each one's origin.
+Apache 2.0 for authored skills. Vendored skills retain their upstream licences;
+consult `SOURCES.toml` for provenance.

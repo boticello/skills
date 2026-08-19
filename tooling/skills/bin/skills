@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "bundler/setup"
+require "skills"
+
+repository_root = File.expand_path("../../..", __dir__)
+exit Skills::CLI.run(ARGV, root: repository_root)

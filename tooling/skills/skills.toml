@@ -1,0 +1,7 @@
+# Configuration for the skills manager. Catalogue membership remains the tree.
+ignore = [".git", ".skillkit", "deploy", "tooling", "vendor"]
+project_roots = ["~/Me/scratch"]
+
+[[target]]
+name = "agents"
+path = "~/.agents/skills"

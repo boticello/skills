@@ -1,0 +1,10 @@
+source "https://rubygems.org"
+
+ruby "4.0.2"
+
+gem "toml-rb", "~> 2.0"
+
+group :development do
+  # Ruby 4.0 no longer ships minitest/autorun in the standard library.
+  gem "minitest", "~> 6.0"
+end

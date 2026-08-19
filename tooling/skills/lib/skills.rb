@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "find"
+require "json"
+require "open3"
+require "optparse"
+require "pathname"
+require "set"
+require "shellwords"
+require "time"
+require "toml-rb"
+require "yaml"
+
+require_relative "skills/catalog"
+require_relative "skills/codex_config"
+require_relative "skills/config"
+require_relative "skills/mirror"
+require_relative "skills/manager"
+require_relative "skills/cli"
