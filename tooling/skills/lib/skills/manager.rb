@@ -4,7 +4,7 @@ module Skills
   class Manager
     attr_reader :config, :catalog
 
-    def initialize(root: Dir.pwd, home: Dir.home)
+    def initialize(root: Dir.pwd, home: Dir.home, reviewer: nil)
       @home = Pathname(home)
       @config = Config.load(root)
       @catalog = Catalog.new(config)
@@ -14,6 +14,7 @@ module Skills
       @doctor = Doctor.new(config: config, catalog: catalog, profiles: @profiles,
                            projects: @projects, linter: @linter, home: @home)
       @vendor = Vendor.new(config: config, catalog: catalog)
+      @reviewer = reviewer || Reviewer.new(criteria_path: config.root.join("meta/manage-skills/references/review.md"))
     end
 
     def resolved(project: nil)
@@ -74,6 +75,15 @@ module Skills
 
     def lint(strict: false)
       @linter.call(strict: strict)
+    end
+
+    def review(name, strict: false)
+      skill = catalog[name]
+      return Result.new([Finding.new(:error, "unknown skill #{name}")], { kind: :review, name: name }) unless skill
+      return Result.new([Finding.new(:error, "cannot review vendored skill #{name}")], { kind: :review, name: name }) if skill.vendor
+
+      findings = @reviewer.call(skill)
+      Result.new(findings, { kind: :review, name: name }, status: strict && findings.any? ? 1 : 0)
     end
 
     def doctor(fix: false, apply: false, project: nil)

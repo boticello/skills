@@ -7,7 +7,7 @@ module Skills
       global: [nil, "Operate on the global manifest (default when --project is absent)"],
       project: ["PATH", "Operate on the project at PATH"],
       json: [nil, "Emit machine-readable JSON"],
-      strict: [nil, "Treat warnings as errors"],
+      strict: [nil, "Use the command's strict finding policy"],
       fix: [nil, "Propose fixes for safe findings"],
       from: ["PATH", "Source target root or skill directory"],
       category: ["NAME", "Canonical category for the gathered skill"],
@@ -72,6 +72,13 @@ module Skills
         args: "",
         options: %i[strict json],
         examples: ["skills lint", "skills lint --strict"]
+      },
+      "review" => {
+        summary: "Assess one canonical skill's writing quality",
+        args: "<name>",
+        options: %i[strict json],
+        examples: ["skills review manage-skills", "skills review manage-skills --strict --json"],
+        guidance: "meta/manage-skills/references/review.md"
       },
       "overlap" => {
         summary: "Report skills with competing triggers",
@@ -139,6 +146,9 @@ module Skills
                  manager.public_send(command, name, project: options[:project], apply: options[:apply])
                when "lint" then manager.lint(strict: options[:strict])
                when "doctor" then manager.doctor(fix: options[:fix], apply: options[:apply], project: options[:project])
+               when "review"
+                 name = shift_argument!("skill name")
+                 manager.review(name, strict: options[:strict])
                when "overlap"
                  scope = options[:scope] || "global"
                  suite = scope == "suite" ? @argv.shift : nil
@@ -250,7 +260,7 @@ module Skills
       @out.puts <<~CONVENTIONS
         Conventions:
           State-changing commands preview by default; pass --apply to write.
-          Exit codes: 0 clean, 1 findings, 2 usage error.
+          Exit codes: 0 success, 1 errors and gating findings, 2 usage error.
           Deploy is a mirror: removals are backed up to ~/.local/state/skills-backups/.
       CONVENTIONS
       @out.puts
@@ -276,6 +286,11 @@ module Skills
         @out.puts "Examples:"
         examples.each { |example| @out.puts "  #{example}" }
       end
+      guidance = spec[:guidance]
+      return 0 unless guidance
+
+      @out.puts
+      @out.puts Pathname(@root).join(guidance).read
       0
     end
 

@@ -119,7 +119,7 @@ class SkillsCliTest < Minitest::Test
       assert_includes out.string, name
     end
     assert_includes out.string, "pass --apply to write"
-    assert_includes out.string, "Exit codes: 0 clean, 1 findings, 2 usage error"
+    assert_includes out.string, "Exit codes: 0 success, 1 errors and gating findings, 2 usage error"
   end
 
   def test_command_help_shows_only_relevant_options
@@ -164,6 +164,115 @@ class SkillsCliTest < Minitest::Test
 
     assert_equal 2, status
     assert_includes err.string, "did you mean: gather?"
+  end
+
+  def test_review_help_prints_the_canonical_criteria
+    root = canonical_root
+    out = StringIO.new
+
+    status = Skills::CLI.run(["review", "--help"], out: out, err: StringIO.new, root: root)
+
+    assert_equal 0, status
+    assert_includes out.string, File.read(root.join("meta/manage-skills/references/review.md"))
+  end
+
+  def test_review_json_exposes_structured_findings_without_gating
+    finding = Skills::Finding.new(
+      :warning,
+      "conciseness: Remove the repeated sentence (\"Repeat this\")",
+      criterion: "conciseness",
+      span: "Repeat this",
+      suggestion: "Remove the repeated sentence"
+    )
+    out = StringIO.new
+
+    status = with_review_manager([finding]) do
+      Skills::CLI.run(["review", "alpha", "--json"], out: out, err: StringIO.new, root: canonical_root)
+    end
+    payload = JSON.parse(out.string)
+
+    assert_equal 0, status
+    assert_equal "conciseness", payload.fetch("findings").first.fetch("criterion")
+    assert_equal "Repeat this", payload.fetch("findings").first.fetch("span")
+    assert_equal "Remove the repeated sentence", payload.fetch("findings").first.fetch("suggestion")
+  end
+
+  def test_review_strict_gates_every_finding
+    finding = Skills::Finding.new(:advice, "routing-quality: Name a realistic request", criterion: "routing-quality", span: "Review skills", suggestion: "Name a realistic request")
+
+    status = with_review_manager([finding]) do
+      Skills::CLI.run(["review", "alpha", "--strict"], out: StringIO.new, err: StringIO.new, root: canonical_root)
+    end
+
+    assert_equal 1, status
+  end
+
+  def test_review_missing_or_extra_name_is_a_usage_error
+    missing_error = StringIO.new
+    missing_status = Skills::CLI.run(["review", "--json"], out: StringIO.new, err: missing_error, root: canonical_root)
+
+    extra_error = StringIO.new
+    extra_status = with_review_manager([]) do
+      Skills::CLI.run(["review", "alpha", "extra", "--json"], out: StringIO.new, err: extra_error, root: canonical_root)
+    end
+
+    assert_equal 2, missing_status
+    assert_equal "missing argument: skill name", JSON.parse(missing_error.string).fetch("error")
+    assert_equal 2, extra_status
+    assert_equal "invalid argument: unexpected arguments: extra", JSON.parse(extra_error.string).fetch("error")
+  end
+
+  def test_review_operational_errors_use_the_json_error_envelope
+    manager = Object.new
+    manager.define_singleton_method(:review) { |_name, strict:| raise Skills::Reviewer::Error, "provider unavailable" }
+    error = StringIO.new
+
+    status = with_manager(manager) do
+      Skills::CLI.run(["review", "alpha", "--json"], out: StringIO.new, err: error, root: canonical_root)
+    end
+
+    assert_equal 1, status
+    assert_equal "provider unavailable", JSON.parse(error.string).fetch("error")
+  end
+
+  def test_doctor_remains_dispatched_after_review_is_added
+    manager = Object.new
+    calls = []
+    manager.define_singleton_method(:doctor) do |fix:, apply:, project:|
+      calls << [fix, apply, project]
+      Skills::Result.new([], { kind: :doctor })
+    end
+
+    status = with_manager(manager) do
+      Skills::CLI.run(["doctor", "--fix"], out: StringIO.new, err: StringIO.new, root: canonical_root)
+    end
+
+    assert_equal 0, status
+    assert_equal [[true, false, nil]], calls
+  end
+
+  private
+
+  def canonical_root
+    Pathname(__dir__).join("../../..").expand_path
+  end
+
+  def with_review_manager(findings)
+    manager = Object.new
+    manager.define_singleton_method(:review) do |name, strict:|
+      Skills::Result.new(findings, { kind: :review, name: name }, status: strict && findings.any? ? 1 : 0)
+    end
+    with_manager(manager) { yield }
+  end
+
+  def with_manager(manager)
+    singleton = Skills::Manager.singleton_class
+    singleton.alias_method(:new_without_review_test, :new)
+    singleton.define_method(:new) { |*_, **_| manager }
+    yield
+  ensure
+    singleton.alias_method(:new, :new_without_review_test)
+    singleton.remove_method(:new_without_review_test)
   end
 
 end

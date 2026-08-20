@@ -81,7 +81,9 @@ Key semantics the preview won't tell you:
   agent-profile suites, drift). `--fix --apply` prunes only provably-safe rot;
   it never writes enable/disable intent.
 - `lint [--strict]` is the repository-wide quality check. Validator scope:
-  `references/validation.md` in this skill's folder.
+  `references/validation.md` in this skill's folder. `skills review <name>`
+  assesses one canonical skill's writing against `references/review.md`;
+  review it before deploy.
 
 ## Procedures
 
@@ -142,7 +144,7 @@ load on the request you're handling?
 **Before deploying, confirm:** the description would fire on a realistic
 request; reference content lives outside the body; no inline ticket refs
 (`bd-xxx`) — state the guidance instead; length within target or consciously
-excepted.
+excepted; run `skills review <name> --json` and address its errors.
 
 ## Related
 

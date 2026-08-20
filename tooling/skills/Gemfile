@@ -3,6 +3,9 @@ source "https://rubygems.org"
 ruby "4.0.2"
 
 gem "toml-rb", "~> 2.0"
+gem "op-secrets", git: "https://github.com/boticello/op-secrets.git"
+gem "ruby_llm", "~> 1.10"
+gem "ruby_llm-schema", "~> 0"
 
 group :development do
   # Ruby 4.0 no longer ships minitest/autorun in the standard library.
