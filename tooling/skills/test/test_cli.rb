@@ -109,4 +109,61 @@ class SkillsCliTest < Minitest::Test
     end
   end
 
+  def test_top_level_help_lists_every_command_with_summaries
+    out = StringIO.new
+
+    status = Skills::CLI.run(["--help"], out: out, err: StringIO.new, root: Dir.pwd)
+
+    assert_equal 0, status
+    Skills::CLI::COMMANDS.each_key do |name|
+      assert_includes out.string, name
+    end
+    assert_includes out.string, "pass --apply to write"
+    assert_includes out.string, "Exit codes: 0 clean, 1 findings, 2 usage error"
+  end
+
+  def test_command_help_shows_only_relevant_options
+    out = StringIO.new
+
+    status = Skills::CLI.run(["gather", "--help"], out: out, err: StringIO.new, root: Dir.pwd)
+
+    assert_equal 0, status
+    assert_includes out.string, "Usage: skills gather <name>"
+    assert_includes out.string, "--from PATH"
+    assert_includes out.string, "--category NAME"
+    refute_includes out.string, "--ref REF"
+    assert_includes out.string, "Examples:"
+  end
+
+  def test_help_subcommand_matches_flag_help
+    flag_out = StringIO.new
+    subcommand_out = StringIO.new
+
+    Skills::CLI.run(["fetch", "--help"], out: flag_out, err: StringIO.new, root: Dir.pwd)
+    Skills::CLI.run(["help", "fetch"], out: subcommand_out, err: StringIO.new, root: Dir.pwd)
+
+    assert_equal flag_out.string, subcommand_out.string
+  end
+
+  def test_unknown_command_suggests_close_match_and_exits_two
+    out = StringIO.new
+    err = StringIO.new
+
+    status = Skills::CLI.run(["depoy"], out: out, err: err, root: Dir.pwd)
+
+    assert_equal 2, status
+    assert_includes err.string, "unknown command 'depoy'"
+    assert_includes err.string, "did you mean: deploy?"
+    assert_includes err.string, "skills --help"
+  end
+
+  def test_help_for_unknown_command_suggests_close_match
+    err = StringIO.new
+
+    status = Skills::CLI.run(["help", "gathr"], out: StringIO.new, err: err, root: Dir.pwd)
+
+    assert_equal 2, status
+    assert_includes err.string, "did you mean: gather?"
+  end
+
 end

@@ -2,6 +2,85 @@
 
 module Skills
   class CLI
+    OPTION_SPECS = {
+      apply: [nil, "Write changes (this command previews by default)"],
+      global: [nil, "Operate on the global manifest (default when --project is absent)"],
+      project: ["PATH", "Operate on the project at PATH"],
+      json: [nil, "Emit machine-readable JSON"],
+      strict: [nil, "Treat warnings as errors"],
+      fix: [nil, "Propose fixes for safe findings"],
+      from: ["PATH", "Source target root or skill directory"],
+      category: ["NAME", "Canonical category for the gathered skill"],
+      scope: ["SCOPE", "Overlap scope: global, project, or suite"],
+      skill: ["NAME", "Fetch a single named skill from the repository"],
+      all: [nil, "Fetch all skills recorded in SOURCES.toml"],
+      list: [nil, "List repository contents without fetching"],
+      ref: ["REF", "Git ref to update to (default: upstream HEAD)"]
+    }.freeze
+
+    COMMANDS = {
+      "list" => {
+        summary: "Show every skill: home, global?, projects, suites, drift",
+        args: "",
+        options: %i[global project json],
+        examples: ["skills list", "skills list --json"]
+      },
+      "enable" => {
+        summary: "Add a skill to a manifest (default: global)",
+        args: "<name>",
+        options: %i[global project apply json],
+        examples: ["skills enable alpha --global --apply"]
+      },
+      "disable" => {
+        summary: "Remove a skill from a manifest",
+        args: "<name>",
+        options: %i[global project apply json],
+        examples: ["skills disable alpha --global --apply"]
+      },
+      "deploy" => {
+        summary: "Mirror the resolved set to target dirs",
+        args: "",
+        options: %i[global project apply json],
+        examples: ["skills deploy", "skills deploy --apply", "skills deploy --project ~/code/app --apply"]
+      },
+      "doctor" => {
+        summary: "Health-check all reference surfaces",
+        args: "",
+        options: %i[global project fix apply json],
+        examples: ["skills doctor", "skills doctor --fix --apply"]
+      },
+      "gather" => {
+        summary: "Adopt a stray skill from a target into canonical",
+        args: "<name>",
+        options: %i[from category apply json],
+        examples: ["skills gather alpha", "skills gather alpha --from ~/.agents/skills --category tools --apply"]
+      },
+      "fetch" => {
+        summary: "Fetch a third-party skill into vendor/",
+        args: "<owner/repo>",
+        options: %i[skill list all apply json],
+        examples: ["skills fetch owner/repo --list", "skills fetch owner/repo --skill name --apply", "skills fetch --all --apply"]
+      },
+      "update" => {
+        summary: "Follow upstream HEAD for a vendored skill",
+        args: "<name>",
+        options: %i[ref apply json],
+        examples: ["skills update alpha --apply"]
+      },
+      "lint" => {
+        summary: "Repository-wide quality check",
+        args: "",
+        options: %i[strict json],
+        examples: ["skills lint", "skills lint --strict"]
+      },
+      "overlap" => {
+        summary: "Report skills with competing triggers",
+        args: "[suite-name]",
+        options: %i[scope project json],
+        examples: ["skills overlap", "skills overlap --scope project --project ~/code/app", "skills overlap --scope suite build"]
+      }
+    }.freeze
+
     def self.run(argv, out: $stdout, err: $stderr, root: Dir.pwd)
       new(argv, out: out, err: err, root: root).run
     end
@@ -16,7 +95,15 @@ module Skills
 
     def run
       command = @argv.shift
-      return usage if command.nil? || %w[help --help -h].include?(command)
+      return top_level_help if command.nil? || command == "help" && @argv.empty?
+      return command_help(@argv.shift) if command == "help"
+      return top_level_help if %w[--help -h].include?(command)
+      return command_help(command) if COMMANDS.key?(command) && @argv.intersect?(%w[--help -h])
+
+      unless COMMANDS.key?(command)
+        unknown_command(command)
+        return 2
+      end
 
       manager = Manager.new(root: @root)
       result = dispatch(manager, command)
@@ -35,19 +122,11 @@ module Skills
     def dispatch(manager, command)
       options = { apply: false, json: false }
       parser = OptionParser.new
-      parser.on("--apply") { options[:apply] = true }
-      parser.on("--global") { options[:global] = true }
-      parser.on("--project PATH") { |value| options[:project] = value }
-      parser.on("--json") { options[:json] = true }
-      parser.on("--strict") { options[:strict] = true }
-      parser.on("--fix") { options[:fix] = true }
-      parser.on("--from PATH") { |value| options[:from] = value }
-      parser.on("--category NAME") { |value| options[:category] = value }
-      parser.on("--scope SCOPE") { |value| options[:scope] = value }
-      parser.on("--skill NAME") { |value| options[:skill] = value }
-      parser.on("--all") { options[:all] = true }
-      parser.on("--list") { options[:list] = true }
-      parser.on("--ref REF") { |value| options[:ref] = value }
+      COMMANDS.fetch(command).fetch(:options).each do |key|
+        parser.on(*option_switch(key), OPTION_SPECS.fetch(key).fetch(1)) do |value|
+          options[key] = value.nil? ? true : value
+        end
+      end
       parser.parse!(@argv)
       raise OptionParser::InvalidOption, "--global and --project are mutually exclusive" if options[:global] && options[:project]
 
@@ -79,12 +158,15 @@ module Skills
                when "update"
                  name = shift_argument!("skill name")
                  manager.update(name, ref: options[:ref], apply: options[:apply])
-               else
-                 raise OptionParser::InvalidOption, "unknown command #{command}"
                end
       raise OptionParser::InvalidArgument, "unexpected arguments: #{@argv.join(" ")}" unless @argv.empty?
 
       result
+    end
+
+    def option_switch(key)
+      argument = OPTION_SPECS.fetch(key).fetch(0)
+      ["--#{key}#{argument ? " #{argument}" : ""}"]
     end
 
     def shift_argument!(name)
@@ -152,15 +234,71 @@ module Skills
       status
     end
 
-    def usage
-      @out.puts <<~USAGE
-        Usage: skills <command> [options]
-
-        Commands: list, enable, disable, deploy, doctor, gather, fetch,
-                  update, lint, overlap
-        State-changing commands preview by default; pass --apply to write.
-      USAGE
+    def top_level_help
+      width = COMMANDS.map { |name, spec| "#{name} #{spec.fetch(:args)}".strip.length }.max
+      @out.puts "Usage: skills <command> [options]"
+      @out.puts
+      @out.puts "Manage the canonical skills store and deploy to targets."
+      @out.puts
+      @out.puts "Commands:"
+      COMMANDS.each do |name, spec|
+        invocation = "#{name} #{spec.fetch(:args)}".strip
+        tag = spec.fetch(:options).include?(:apply) ? "[preview]" : "[read-only]"
+        @out.puts format("  %-#{width}s  %s %s", invocation, spec.fetch(:summary), tag)
+      end
+      @out.puts
+      @out.puts <<~CONVENTIONS
+        Conventions:
+          State-changing commands preview by default; pass --apply to write.
+          Exit codes: 0 clean, 1 findings, 2 usage error.
+          Deploy is a mirror: removals are backed up to ~/.local/state/skills-backups/.
+      CONVENTIONS
+      @out.puts
+      @out.puts "Run `skills <command> --help` for command details."
       0
+    end
+
+    def command_help(command)
+      return unknown_command(command) unless COMMANDS.key?(command)
+
+      spec = COMMANDS.fetch(command)
+      @out.puts "Usage: skills #{command} #{spec.fetch(:args)}".strip
+      @out.puts
+      @out.puts spec.fetch(:summary) + "."
+      @out.puts
+      @out.puts "Options:"
+      spec.fetch(:options).each do |key|
+        @out.puts format("  %-18s %s", option_switch(key).first, OPTION_SPECS.fetch(key).fetch(1))
+      end
+      examples = spec.fetch(:examples)
+      unless examples.empty?
+        @out.puts
+        @out.puts "Examples:"
+        examples.each { |example| @out.puts "  #{example}" }
+      end
+      0
+    end
+
+    def unknown_command(command)
+      suggestion = COMMANDS.keys.min_by { |name| levenshtein(command, name) }
+      hint = levenshtein(command, suggestion) <= 2 ? " (did you mean: #{suggestion}?)" : ""
+      @err.puts "error: unknown command '#{command}'#{hint}"
+      @err.puts
+      @err.puts "Run `skills --help` for the command table."
+      2
+    end
+
+    def levenshtein(a, b)
+      previous = (0..b.length).to_a
+      a.each_char.with_index(1) do |char, i|
+        current = [i]
+        b.each_char.with_index(1) do |other, j|
+          cost = char == other ? 0 : 1
+          current << [current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost].min
+        end
+        previous = current
+      end
+      previous[b.length]
     end
   end
 end
