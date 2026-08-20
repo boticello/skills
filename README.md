@@ -33,9 +33,25 @@ target; migration removes only the managed copies there, with backups, and
 leaves non-managed content alone.
 
 All state-changing commands preview by default. Add `--apply` to write.
-Commands return `0` when clean, `1` for reported problems, and `2` for usage
-errors. Every command accepts `--json` for agent consumption. On first use the
-entrypoint installs missing locked gems with Bundler, then restarts itself.
+Most commands return `0` when clean, `1` for reported problems, and `2` for
+usage errors. `review` is advisory: a valid review with findings returns `0`;
+`review --strict` returns `1` for every finding. Every command accepts `--json`
+for agent consumption. On first use the entrypoint installs missing locked gems
+with Bundler, then restarts itself.
+
+### Review one skill's writing
+
+```bash
+tooling/skills/bin/skills review manage-skills
+tooling/skills/bin/skills review manage-skills --strict --json
+```
+
+`review` uses OpenCode Zen with `mimo-v2.5`. It self-wraps through `op-env`
+using `OPENCODE_GO_API_KEY` (or `OPENCODE_API_KEY` as a fallback), so a bare
+invocation can load its 1Password-backed credential. It sends the selected
+canonical `SKILL.md`, the [review criteria](meta/manage-skills/references/review.md),
+and that skill's reference filenames to the external service. Use `skills review
+--help` to read the same criteria without a credential.
 
 Run the complete network-free test suite from the Ruby project:
 

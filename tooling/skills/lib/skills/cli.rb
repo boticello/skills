@@ -7,7 +7,7 @@ module Skills
       global: [nil, "Operate on the global manifest (default when --project is absent)"],
       project: ["PATH", "Operate on the project at PATH"],
       json: [nil, "Emit machine-readable JSON"],
-      strict: [nil, "Treat warnings as errors"],
+      strict: [nil, "Use the command's strict finding policy"],
       fix: [nil, "Propose fixes for safe findings"],
       from: ["PATH", "Source target root or skill directory"],
       category: ["NAME", "Canonical category for the gathered skill"],
@@ -81,6 +81,14 @@ module Skills
         args: "",
         options: %i[strict json],
         examples: ["skills lint", "skills lint --strict"]
+      },
+      "review" => {
+        handler: :dispatch_review,
+        summary: "Assess one canonical skill's writing quality",
+        args: "<name>",
+        options: %i[strict json],
+        examples: ["skills review manage-skills", "skills review manage-skills --strict --json"],
+        guidance: "meta/manage-skills/references/review.md"
       },
       "overlap" => {
         handler: :dispatch_overlap,
@@ -200,6 +208,11 @@ module Skills
       manager.lint(strict: options[:strict])
     end
 
+    def dispatch_review(manager, options)
+      name = shift_argument!("skill name")
+      manager.review(name, strict: options[:strict])
+    end
+
     def dispatch_overlap(manager, options)
       scope = options[:scope] || "global"
       suite = scope == "suite" ? @argv.shift : nil
@@ -296,7 +309,7 @@ module Skills
       io.puts <<~CONVENTIONS
         Conventions:
           State-changing commands preview by default; pass --apply to write.
-          Exit codes: 0 clean, 1 findings, 2 usage error.
+          Exit codes: 0 success, 1 errors and gating findings, 2 usage error.
           Deploy is a mirror: removals are backed up to ~/.local/state/skills-backups/.
       CONVENTIONS
       io.puts
@@ -321,6 +334,11 @@ module Skills
         io.puts
         io.puts "Examples:"
         examples.each { |example| io.puts "  #{example}" }
+      end
+      guidance = spec[:guidance]
+      if guidance
+        io.puts
+        io.puts Pathname(@root).join(guidance).read
       end
       0
     end

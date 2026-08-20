@@ -42,6 +42,22 @@ reference.
 4. **What is authoritative and fresh?** Check index state where it matters,
    then verify conclusions against source, raw Git, or the maintained record.
 
+## Establish authority and tool health
+
+Search results are leads; the controlling contract depends on the question.
+
+- For project behaviour, start with the nearest local precedent, configuration,
+  and tests. A sibling tool often captures credential, endpoint, and runtime
+  conventions that generic documentation cannot.
+- For a locked third-party dependency, inspect the lock/runtime declaration and
+  installed or vendored source before current documentation. Read documentation
+  matching the locked version when available; current docs must not override
+  the dependency actually running in the project.
+- A tool reporting `ready` is a hypothesis, not proof. When its answer is
+  material, validate it with a known-answer query. An impossible empty result
+  means the tool is degraded for this task: pivot once to the named fallback
+  and record an operational issue instead of repeatedly retrying it.
+
 ## Routing table
 
 | Question | Start with | Value and boundary |
@@ -56,11 +72,13 @@ reference.
 | Which ticket owns this, or what rationale was recorded there? | The project's tracker (`br` in this repository; Backlog in the alan-puzzle project) | Commitment and ownership record; follow the owning project's tracker workflow rather than treating a search result as current truth. |
 | What happened in an earlier agent session? | AgentsView recall/content search | Searches conversation and tool evidence; corroborate against maintained records. |
 | How do code and design documents connect end to end? | Morph `codebase_search` | Cross-corpus exploration; slower/paid, so reserve for genuine code+docs questions. |
-| How does an external package or API work? | Nia/external primary-source search, when configured | Outside-repository corpus; load the relevant external-search skill first. |
+| How does a locked external package or API work here? | Local precedent and installed source, then version-matched primary docs | Project conventions and the locked runtime are authoritative; use an external-search tool only when it is actually configured and runnable. |
 
-When a compiler/LSP query surface is available, prefer it for type-resolved
-references, hierarchy, diagnostics and rename safety. Ken, sem and tree-sitter
-graphs do not replace compiler semantics.
+When a compiler/LSP query surface returns a credible answer, prefer it for
+type-resolved references, hierarchy, diagnostics and rename safety. A known
+false negative makes it unavailable for the task; use Ken for discovery and
+exact search for exhaustive call sites. Ken, sem and tree-sitter graphs do not
+replace compiler semantics.
 
 ## Operating sequence
 
@@ -83,6 +101,7 @@ graphs do not replace compiler semantics.
 - Primary for natural-language current-code discovery and terse symbol lookup.
 - Check `status` if index freshness or language coverage is material.
 - Use `find_related` after a good result to locate similar implementations.
+- Use Ken to locate a named local precedent before inferring a new convention.
 - Do not treat ranked results as exhaustive.
 
 ### sem
@@ -96,6 +115,8 @@ graphs do not replace compiler semantics.
   question needs arbitrary graph traversal or architectural clustering.
 - Entity extraction is structural, not type-resolved. Git remains the record
   of the exact patch.
+- When a patch overlaps a dirty or nearby change, inspect the semantic diff and
+  impact before editing the shared control flow.
 
 ### cbm
 

@@ -64,9 +64,14 @@ Do not split files merely because they are long. Split when a component can be t
 
 ### 3. Keep external effects at the edges
 
-Use a functional core and imperative shell. Network calls, environment variables, timestamps, and file writes should not be scattered through rendering or business logic.
+Use a functional core and imperative shell. Network calls, environment
+variables, timestamps, file writes, and outbound payload construction should
+not be scattered through rendering or business logic.
 
-Build environment-reading clients through a small factory (`Client.from_environment`) so the plain constructor accepts an injected transport and tests need no credentials.
+Build environment-reading clients through a small factory
+(`Client.from_environment`) so the plain constructor accepts an injected
+transport and tests need no credentials. State the exact outbound data boundary:
+local paths, identifiers, and authored content are external effects too.
 
 ### 4. Plan before applying
 
@@ -104,7 +109,13 @@ Prefer idempotent behaviour:
 
 ### 6. Treat external services as unreliable
 
-Handle timeouts, pagination, missing fields, authentication failures, and useful contextual errors. Retry only operations that are safe to repeat.
+Handle timeouts, pagination, missing fields, authentication failures, and
+useful contextual errors. Retry only operations that are safe to repeat.
+
+A dependency default is not the command's retry policy. For paid,
+non-idempotent, or privacy-sensitive requests, configure retries explicitly—
+normally zero unless the contract deliberately permits replay—and verify the
+real client through a terminal transport test.
 
 ### 7. Keep dependencies deliberately boring
 

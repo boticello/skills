@@ -525,6 +525,73 @@ class SkillsManagerTest < Minitest::Test
     end
   end
 
+  def test_review_uses_injected_reviewer_and_only_strict_gates_findings
+    with_manager_sandbox do |root|
+      write_skill(root, "alpha")
+      received = []
+      finding = Skills::Finding.new(:advice, "routing-quality: Name a request", criterion: "routing-quality", span: "description: alpha", suggestion: "Name a request")
+      reviewer = lambda do |skill|
+        received << skill
+        [finding]
+      end
+      manager = Skills::Manager.new(root: root, reviewer: reviewer)
+
+      advisory = manager.review("alpha")
+      strict = manager.review("alpha", strict: true)
+
+      assert_equal ["alpha", "alpha"], received.map(&:name)
+      assert_equal 0, advisory.exit_code
+      assert_equal 1, strict.exit_code
+      assert_equal finding, advisory.findings.first
+    end
+  end
+
+  def test_review_rejects_unknown_and_vendored_skills_without_calling_reviewer
+    with_manager_sandbox do |root|
+      directory = root.join("vendor/external")
+      FileUtils.mkdir_p(directory)
+      File.write(directory.join("SKILL.md"), "---\nname: external\ndescription: external\n---\n")
+      reviewer = ->(_skill) { flunk "reviewer must not receive invalid targets" }
+      manager = Skills::Manager.new(root: root, reviewer: reviewer)
+
+      unknown = manager.review("missing")
+      vendored = manager.review("external")
+
+      assert_equal 1, unknown.exit_code
+      assert_equal "unknown skill missing", unknown.findings.first.message
+      assert_equal 1, vendored.exit_code
+      assert_equal "cannot review vendored skill external", vendored.findings.first.message
+    end
+  end
+
+  def test_review_rejects_duplicate_canonical_names_without_calling_reviewer
+    with_manager_sandbox do |root|
+      paths = %w[first second].map do |category|
+        directory = root.join(category, "alpha")
+        FileUtils.mkdir_p(directory)
+        File.write(directory.join("SKILL.md"), "---\nname: alpha\ndescription: alpha\n---\n")
+        directory
+      end
+      reviewer = ->(_skill) { flunk "reviewer must not receive an ambiguous target" }
+
+      result = Skills::Manager.new(root: root, reviewer: reviewer).review("alpha")
+
+      assert_equal 1, result.exit_code
+      assert_includes result.findings.first.message, "cannot review duplicate skill alpha"
+      paths.each { |path| assert_includes result.findings.first.message, path.to_s }
+    end
+  end
+
+  def test_review_protocol_keeps_existing_findings_and_results_compatible
+    finding = Skills::Finding.new(:warning, "existing finding")
+    result = Skills::Result.new([finding], nil)
+
+    assert_nil finding.criterion
+    assert_nil finding.span
+    assert_nil finding.suggestion
+    assert_equal 1, result.exit_code
+  end
+
   private
 
   def write_upstream_skill(root, name, value)
