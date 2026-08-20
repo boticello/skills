@@ -62,9 +62,11 @@ craft (intent capture, drafting, test prompts).
 ## The manager
 
 ```bash
-cd ~/Me/repos/skills/tooling/skills
-mise exec -- bundle exec ruby bin/skills <command> [options]
+~/Me/repos/skills/bin/skills <command> [options]
 ```
+
+Works from any directory (paths resolve from the script's own location, and
+it re-execs under the pinned Ruby via mise if needed).
 
 Every state-changing command **previews by default**; `--apply` writes — read
 the preview, apply deliberately. Exit codes: 0 clean, 1 findings, 2 usage.

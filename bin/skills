@@ -1,0 +1,4 @@
+#!/bin/sh
+# Root-level entrypoint for the skills manager (tooling/skills).
+# Resolves the pinned Ruby through mise so the call works from any cwd.
+exec mise exec -- ruby "$(dirname "$0")/../tooling/skills/bin/skills" "$@"
