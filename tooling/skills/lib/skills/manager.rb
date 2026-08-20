@@ -80,6 +80,9 @@ module Skills
     def review(name, strict: false)
       skill = catalog[name]
       return Result.new([Finding.new(:error, "unknown skill #{name}")], { kind: :review, name: name }) unless skill
+
+      duplicates = catalog.duplicates.fetch(name, [])
+      return Result.new([Finding.new(:error, "cannot review duplicate skill #{name}: #{duplicates.join(", ")}")], { kind: :review, name: name }) if duplicates.any?
       return Result.new([Finding.new(:error, "cannot review vendored skill #{name}")], { kind: :review, name: name }) if skill.vendor
 
       findings = @reviewer.call(skill)

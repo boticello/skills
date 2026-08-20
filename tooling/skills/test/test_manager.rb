@@ -564,6 +564,24 @@ class SkillsManagerTest < Minitest::Test
     end
   end
 
+  def test_review_rejects_duplicate_canonical_names_without_calling_reviewer
+    with_manager_sandbox do |root|
+      paths = %w[first second].map do |category|
+        directory = root.join(category, "alpha")
+        FileUtils.mkdir_p(directory)
+        File.write(directory.join("SKILL.md"), "---\nname: alpha\ndescription: alpha\n---\n")
+        directory
+      end
+      reviewer = ->(_skill) { flunk "reviewer must not receive an ambiguous target" }
+
+      result = Skills::Manager.new(root: root, reviewer: reviewer).review("alpha")
+
+      assert_equal 1, result.exit_code
+      assert_includes result.findings.first.message, "cannot review duplicate skill alpha"
+      paths.each { |path| assert_includes result.findings.first.message, path.to_s }
+    end
+  end
+
   def test_review_protocol_keeps_existing_findings_and_results_compatible
     finding = Skills::Finding.new(:warning, "existing finding")
     result = Skills::Result.new([finding], nil)
