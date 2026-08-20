@@ -20,60 +20,70 @@ module Skills
 
     COMMANDS = {
       "list" => {
+        handler: :dispatch_list,
         summary: "Show every skill: home, global?, projects, suites, drift",
         args: "",
         options: %i[global project json],
         examples: ["skills list", "skills list --json"]
       },
       "enable" => {
+        handler: :dispatch_enable,
         summary: "Add a skill to a manifest (default: global)",
         args: "<name>",
         options: %i[global project apply json],
         examples: ["skills enable alpha --global --apply"]
       },
       "disable" => {
+        handler: :dispatch_disable,
         summary: "Remove a skill from a manifest",
         args: "<name>",
         options: %i[global project apply json],
         examples: ["skills disable alpha --global --apply"]
       },
       "deploy" => {
+        handler: :dispatch_deploy,
         summary: "Mirror the resolved set to target dirs",
         args: "",
         options: %i[global project apply json],
         examples: ["skills deploy", "skills deploy --apply", "skills deploy --project ~/code/app --apply"]
       },
       "doctor" => {
+        handler: :dispatch_doctor,
         summary: "Health-check all reference surfaces",
         args: "",
         options: %i[global project fix apply json],
         examples: ["skills doctor", "skills doctor --fix --apply"]
       },
       "gather" => {
+        handler: :dispatch_gather,
         summary: "Adopt a stray skill from a target into canonical",
         args: "<name>",
         options: %i[from category apply json],
         examples: ["skills gather alpha", "skills gather alpha --from ~/.agents/skills --category tools --apply"]
       },
       "fetch" => {
+        handler: :dispatch_fetch,
         summary: "Fetch a third-party skill into vendor/",
         args: "<owner/repo>",
         options: %i[skill list all apply json],
         examples: ["skills fetch owner/repo --list", "skills fetch owner/repo --skill name --apply", "skills fetch --all --apply"]
       },
       "update" => {
+        handler: :dispatch_update,
         summary: "Follow upstream HEAD for a vendored skill",
         args: "<name>",
         options: %i[ref apply json],
         examples: ["skills update alpha --apply"]
       },
       "lint" => {
+        handler: :dispatch_lint,
         summary: "Repository-wide quality check",
         args: "",
         options: %i[strict json],
         examples: ["skills lint", "skills lint --strict"]
       },
       "overlap" => {
+        handler: :dispatch_overlap,
         summary: "Report skills with competing triggers",
         args: "[suite-name]",
         options: %i[scope project json],
@@ -105,12 +115,15 @@ module Skills
         return 2
       end
 
+      @command = command
       manager = Manager.new(root: @root)
       result = dispatch(manager, command)
       report(result)
       result.exit_code
     rescue OptionParser::ParseError => error
       report_error(error.message, 2)
+      command_help(@command, io: @err) unless json_requested?
+      2
     rescue ArgumentError => error
       report_error(error.message, 2)
     rescue StandardError => error
@@ -131,43 +144,73 @@ module Skills
       raise OptionParser::InvalidOption, "--global and --project are mutually exclusive" if options[:global] && options[:project]
 
       @json = options[:json]
-      result = case command
-               when "list" then manager.list(project: options[:project])
-               when "deploy" then manager.deploy(project: options[:project], apply: options[:apply])
-               when "enable", "disable"
-                 name = shift_argument!("skill name")
-                 manager.public_send(command, name, project: options[:project], apply: options[:apply])
-               when "lint" then manager.lint(strict: options[:strict])
-               when "doctor" then manager.doctor(fix: options[:fix], apply: options[:apply], project: options[:project])
-               when "overlap"
-                 scope = options[:scope] || "global"
-                 suite = scope == "suite" ? @argv.shift : nil
-                 manager.overlap(scope: scope, project: options[:project], suite: suite)
-               when "gather"
-                 name = shift_argument!("skill name")
-                 manager.gather(name, from: options[:from], category: options[:category] || "personal", apply: options[:apply])
-               when "fetch"
-                 if options[:all]
-                   raise OptionParser::InvalidOption, "fetch --all does not accept a repository" unless @argv.empty?
-
-                   manager.fetch_all(apply: options[:apply])
-                 else
-                   repository = shift_argument!("repository")
-                   manager.fetch(repository, skill: options[:skill], list: options[:list], apply: options[:apply])
-                 end
-               when "update"
-                 name = shift_argument!("skill name")
-                 manager.update(name, ref: options[:ref], apply: options[:apply])
-               end
+      handler = COMMANDS.fetch(command).fetch(:handler)
+      result = send(handler, manager, options)
       raise OptionParser::InvalidArgument, "unexpected arguments: #{@argv.join(" ")}" unless @argv.empty?
 
       result
+    end
+    def dispatch_list(manager, options)
+      manager.list(project: options[:project])
+    end
+
+    def dispatch_enable(manager, options)
+      dispatch_manifest_change(manager, options, :enable)
+    end
+
+    def dispatch_disable(manager, options)
+      dispatch_manifest_change(manager, options, :disable)
+    end
+
+    def dispatch_manifest_change(manager, options, action)
+      name = shift_argument!("skill name")
+      manager.public_send(action, name, project: options[:project], apply: options[:apply])
+    end
+
+    def dispatch_deploy(manager, options)
+      manager.deploy(project: options[:project], apply: options[:apply])
+    end
+
+    def dispatch_doctor(manager, options)
+      manager.doctor(fix: options[:fix], apply: options[:apply], project: options[:project])
+    end
+
+    def dispatch_gather(manager, options)
+      name = shift_argument!("skill name")
+      manager.gather(name, from: options[:from], category: options[:category] || "personal", apply: options[:apply])
+    end
+
+    def dispatch_fetch(manager, options)
+      if options[:all]
+        raise OptionParser::InvalidOption, "fetch --all does not accept a repository" unless @argv.empty?
+
+        manager.fetch_all(apply: options[:apply])
+      else
+        repository = shift_argument!("repository")
+        manager.fetch(repository, skill: options[:skill], list: options[:list], apply: options[:apply])
+      end
+    end
+
+    def dispatch_update(manager, options)
+      name = shift_argument!("skill name")
+      manager.update(name, ref: options[:ref], apply: options[:apply])
+    end
+
+    def dispatch_lint(manager, options)
+      manager.lint(strict: options[:strict])
+    end
+
+    def dispatch_overlap(manager, options)
+      scope = options[:scope] || "global"
+      suite = scope == "suite" ? @argv.shift : nil
+      manager.overlap(scope: scope, project: options[:project], suite: suite)
     end
 
     def option_switch(key)
       argument = OPTION_SPECS.fetch(key).fetch(0)
       ["--#{key}#{argument ? " #{argument}" : ""}"]
     end
+
 
     def shift_argument!(name)
       @argv.shift || raise(OptionParser::MissingArgument, name)
@@ -233,48 +276,51 @@ module Skills
       end
       status
     end
+    def json_requested?
+      @json || @raw_argv.include?("--json")
+    end
 
-    def top_level_help
+    def top_level_help(io: @out)
       width = COMMANDS.map { |name, spec| "#{name} #{spec.fetch(:args)}".strip.length }.max
-      @out.puts "Usage: skills <command> [options]"
-      @out.puts
-      @out.puts "Manage the canonical skills store and deploy to targets."
-      @out.puts
-      @out.puts "Commands:"
+      io.puts "Usage: skills <command> [options]"
+      io.puts
+      io.puts "Manage the canonical skills store and deploy to targets."
+      io.puts
+      io.puts "Commands:"
       COMMANDS.each do |name, spec|
         invocation = "#{name} #{spec.fetch(:args)}".strip
         tag = spec.fetch(:options).include?(:apply) ? "[preview]" : "[read-only]"
-        @out.puts format("  %-#{width}s  %s %s", invocation, spec.fetch(:summary), tag)
+        io.puts format("  %-#{width}s  %s %s", invocation, spec.fetch(:summary), tag)
       end
-      @out.puts
-      @out.puts <<~CONVENTIONS
+      io.puts
+      io.puts <<~CONVENTIONS
         Conventions:
           State-changing commands preview by default; pass --apply to write.
           Exit codes: 0 clean, 1 findings, 2 usage error.
           Deploy is a mirror: removals are backed up to ~/.local/state/skills-backups/.
       CONVENTIONS
-      @out.puts
-      @out.puts "Run `skills <command> --help` for command details."
+      io.puts
+      io.puts "Run `skills <command> --help` for command details."
       0
     end
 
-    def command_help(command)
+    def command_help(command, io: @out)
       return unknown_command(command) unless COMMANDS.key?(command)
 
       spec = COMMANDS.fetch(command)
-      @out.puts "Usage: skills #{command} #{spec.fetch(:args)}".strip
-      @out.puts
-      @out.puts spec.fetch(:summary) + "."
-      @out.puts
-      @out.puts "Options:"
+      io.puts "Usage: skills #{command} #{spec.fetch(:args)}".strip
+      io.puts
+      io.puts spec.fetch(:summary) + "."
+      io.puts
+      io.puts "Options:"
       spec.fetch(:options).each do |key|
-        @out.puts format("  %-18s %s", option_switch(key).first, OPTION_SPECS.fetch(key).fetch(1))
+        io.puts format("  %-18s %s", option_switch(key).first, OPTION_SPECS.fetch(key).fetch(1))
       end
       examples = spec.fetch(:examples)
       unless examples.empty?
-        @out.puts
-        @out.puts "Examples:"
-        examples.each { |example| @out.puts "  #{example}" }
+        io.puts
+        io.puts "Examples:"
+        examples.each { |example| io.puts "  #{example}" }
       end
       0
     end
@@ -284,7 +330,7 @@ module Skills
       hint = levenshtein(command, suggestion) <= 2 ? " (did you mean: #{suggestion}?)" : ""
       @err.puts "error: unknown command '#{command}'#{hint}"
       @err.puts
-      @err.puts "Run `skills --help` for the command table."
+      top_level_help(io: @err)
       2
     end
 

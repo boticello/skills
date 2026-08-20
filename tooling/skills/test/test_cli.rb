@@ -122,6 +122,14 @@ class SkillsCliTest < Minitest::Test
     assert_includes out.string, "Exit codes: 0 clean, 1 findings, 2 usage error"
   end
 
+  def test_every_registered_command_has_a_dispatch_handler
+    cli = Skills::CLI.new([], out: StringIO.new, err: StringIO.new, root: Dir.pwd)
+
+    Skills::CLI::COMMANDS.each_value do |spec|
+      assert cli.respond_to?(spec.fetch(:handler), true)
+    end
+  end
+
   def test_command_help_shows_only_relevant_options
     out = StringIO.new
 
@@ -145,7 +153,7 @@ class SkillsCliTest < Minitest::Test
     assert_equal flag_out.string, subcommand_out.string
   end
 
-  def test_unknown_command_suggests_close_match_and_exits_two
+  def test_unknown_command_suggests_close_match_and_prints_command_table
     out = StringIO.new
     err = StringIO.new
 
@@ -154,7 +162,8 @@ class SkillsCliTest < Minitest::Test
     assert_equal 2, status
     assert_includes err.string, "unknown command 'depoy'"
     assert_includes err.string, "did you mean: deploy?"
-    assert_includes err.string, "skills --help"
+    assert_includes err.string, "Commands:"
+    assert_includes err.string, "gather <name>"
   end
 
   def test_help_for_unknown_command_suggests_close_match
@@ -164,6 +173,45 @@ class SkillsCliTest < Minitest::Test
 
     assert_equal 2, status
     assert_includes err.string, "did you mean: gather?"
+  end
+
+  def test_invalid_option_prints_command_help
+    with_manager_sandbox do |root|
+      err = StringIO.new
+
+      status = Skills::CLI.run(["gather", "--bogus"], out: StringIO.new, err: err, root: root)
+
+      assert_equal 2, status
+      assert_includes err.string, "invalid option: --bogus"
+      assert_includes err.string, "Usage: skills gather <name>"
+      assert_includes err.string, "--from PATH"
+      refute_includes err.string, "--ref REF"
+    end
+  end
+
+  def test_missing_argument_prints_command_help
+    with_manager_sandbox do |root|
+      err = StringIO.new
+
+      status = Skills::CLI.run(["gather"], out: StringIO.new, err: err, root: root)
+
+      assert_equal 2, status
+      assert_includes err.string, "missing argument: skill name"
+      assert_includes err.string, "Usage: skills gather <name>"
+    end
+  end
+
+  def test_json_usage_error_remains_machine_readable
+    with_manager_sandbox do |root|
+      err = StringIO.new
+
+      status = Skills::CLI.run(["gather", "--json"], out: StringIO.new, err: err, root: root)
+      payload = JSON.parse(err.string)
+
+      assert_equal 2, status
+      assert_equal "missing argument: skill name", payload.fetch("error")
+      assert_equal 2, payload.fetch("exit_code")
+    end
   end
 
 end
