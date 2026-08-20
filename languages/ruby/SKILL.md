@@ -61,9 +61,19 @@ Do not load secrets into source files, fixtures, command output, or committed en
 
 When planned work depends on an external credential, validate the key early with a read-only probe that prints status codes only, never values. Where a default depends on an external service — model, tier, endpoint — choose it based on measured realistic use.
 
-When adding a gem, first establish the concrete problem it solves and why the standard library or an existing dependency is no longer clear. Check current documentation, add one capability at a time, update the lockfile, and verify the operational effect.
+When adding a gem, first establish the concrete problem it solves and why the
+standard library or an existing dependency is no longer clear. Check current
+documentation, add one capability at a time, update the lockfile, and verify
+the operational effect.
 
-Consult local sources in this order before guessing: project code, tests, and README for project-specific behavior; installed gem source for dependency behavior; then current official documentation. Prefer documentation matching the project runtime over generic web answers.
+For a locked external library, establish both contracts before coding:
+
+1. Read the nearest local precedent for project-specific credentials, endpoints,
+   and runtime conventions.
+2. Inspect the lockfile and installed or vendored source for the exact methods,
+   configuration defaults, and middleware that will run.
+3. Read documentation matching the locked version when available. Current web
+   documentation is context; it does not override the dependency in the lock.
 
 ### 3. Establish a baseline before editing
 
@@ -93,6 +103,8 @@ Before choosing tests or abstractions, write down the behavior that matters:
 - stdout, stderr, and exit statuses;
 - safe defaults and explicitly dangerous operations;
 - authentication and failure behavior;
+- the exact data crossing each remote boundary, including local identifiers,
+  paths, and content that must not leave the machine;
 - ordering, naming, idempotency, and rerun expectations;
 - dry-run versus check versus apply semantics, where applicable.
 
@@ -167,14 +179,21 @@ Avoid:
 - adding a live end-to-end test when a deterministic fixture tests the same decision;
 - adding tests solely to satisfy an arbitrary coverage percentage.
 
-Prefer small fakes or fixture-backed adapters over long mock setups. If a constructor reads the environment and creates a network client, separate those concerns so tests can inject a fake transport without requiring a credential:
+Prefer small fakes or fixture-backed adapters for the program's own boundaries.
+If a constructor reads the environment and creates a network client, separate
+those concerns so tests can inject a fake transport without requiring a
+credential:
 
 ```ruby
-Client.from_environment       # production boundary
-Client.new(graphql_client: fake) # deterministic test boundary
+Client.from_environment
+Client.new(graphql_client: fake)
 ```
 
-Verify what a fake promises against the real dependency's API — installed gem source or current documentation — before writing assertions against it.
+For a locked client library, do not reproduce its fluent or configuration API
+in a fake. Construct the real locked client and replace only its terminal HTTP
+transport. Assert the outgoing payload, attempt count, failure translation, and
+declared outbound-data boundary. Verify any remaining fake's promise against
+the installed dependency source before relying on it.
 
 For GraphQL or other protocol clients, fixtures should exercise the adapter's real pagination and normalization logic. If the client library parses or validates queries, supply a local schema fixture so the offline suite still catches contract drift such as a mistyped field name. Stub the transport rather than the client library, route responses by operation, and record requests so cursor follow-ups can be asserted. Expect the library to transform what crosses the boundary — stringified variable keys, renamed operations; a hanging pagination test usually means the stubbed pages never terminate. Keep an optional live smoke test outside the default suite and run it through the project's explicit credential boundary.
 
